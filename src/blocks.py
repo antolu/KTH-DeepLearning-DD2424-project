@@ -1,8 +1,39 @@
+from test.test_socket import HAVE_SOCKET_RDS
+
 import torch
 
 
+class BidirectionalGRU(torch.nn.Module):
+    def __init__(self):
+        self.h = torch.randn()
+
+    def forward(self, x):
+        pass
+
+
+class ConditioningAugmentation(torch.nn.Module):
+    def forward(self, x):
+        m = torch.mean(x)
+        s = torch.std(x)
+        return torch.randn(x.shape) * s + m
+
+
+class TemporalAverage(torch.nn.Module):
+    def forward(self, x):
+        return x.mean(1)
+
+
 class TextEncoder(torch.nn.Module):
-    pass
+    def __init__(self):
+        self.main = torch.nn.Sequential(
+            BidirectionalGRU(300, 512),
+            TemporalAverage(),
+            torch.nn.LeakyReLU(),
+            ConditioningAugmentation()
+        )
+
+    def forward(self, text):
+        o = self.bgru.forward(text)
 
 
 class ImageEncoder(torch.nn.Module):
@@ -35,11 +66,13 @@ class ConditionalDiscriminator(torch.nn.Module):
 
 class Generator(torch.nn.Module):
     def __init__(self):
-        self.a = TextEncoder()
-        self.b = ImageEncoder()
-        self.ab = ConcatABResidualBlocks()
-        self.c = ResidualBlock()
-        self.d = Decoder()
+        self.main = torch.nn.Sequential(
+            TextEncoder(),
+            ImageEncoder(),
+            ConcatABResidualBlocks(),
+            ResidualBlock(),
+            Decoder()
+        )
 
     def forward(self, xtext, ximage):
         # x includes both the text and the image
@@ -47,7 +80,7 @@ class Generator(torch.nn.Module):
         b = self.b.forward(ximage)
         ab = self.ab.forward(a, b)
         c = self.c.forward(ab)
-        d = self.d.forward(c)
+        d = self.d.forward(b + c)
         return d
 
 
