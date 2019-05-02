@@ -1,14 +1,7 @@
 from test.test_socket import HAVE_SOCKET_RDS
 
 import torch
-
-
-class BidirectionalGRU(torch.nn.Module):
-    def __init__(self):
-        self.h = torch.randn()
-
-    def forward(self, x):
-        pass
+import torch.nn
 
 
 class ConditioningAugmentation(torch.nn.Module):
@@ -25,8 +18,9 @@ class TemporalAverage(torch.nn.Module):
 
 class TextEncoder(torch.nn.Module):
     def __init__(self):
+        super().__init__()
         self.main = torch.nn.Sequential(
-            BidirectionalGRU(300, 512),
+            torch.nn.GRU(input_size=300, 512, bidirectional=True),
             TemporalAverage(),
             torch.nn.LeakyReLU(),
             ConditioningAugmentation()
@@ -66,6 +60,7 @@ class ConditionalDiscriminator(torch.nn.Module):
 
 class Generator(torch.nn.Module):
     def __init__(self):
+        super().__init__()
         self.main = torch.nn.Sequential(
             TextEncoder(),
             ImageEncoder(),
@@ -86,6 +81,7 @@ class Generator(torch.nn.Module):
 
 class Discriminator(torch.nn.Module):
     def __init__(self):
+        super().__init__()
         self.ie = ImageEncoder()
         self.ud = UnconditionalDiscriminator()
         self.te = TextEncoder()
