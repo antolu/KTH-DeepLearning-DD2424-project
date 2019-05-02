@@ -13,14 +13,14 @@ class ConditioningAugmentation(torch.nn.Module):
 
 class TemporalAverage(torch.nn.Module):
     def forward(self, x):
-        return x.mean(1)
+        return x.mean()
 
 
 class TextEncoder(torch.nn.Module):
-    def __init__(self):
+    def __init__(self, num_words):
         super().__init__()
         self.main = torch.nn.Sequential(
-            torch.nn.GRU(input_size=300, 512, bidirectional=True),
+            torch.nn.GRU(input_size=num_words*300, hidden_size=512, bidirectional=True),
             TemporalAverage(),
             torch.nn.LeakyReLU(),
             ConditioningAugmentation()
@@ -59,10 +59,10 @@ class ConditionalDiscriminator(torch.nn.Module):
 
 
 class Generator(torch.nn.Module):
-    def __init__(self):
+    def __init__(self, num_words):
         super().__init__()
         self.main = torch.nn.Sequential(
-            TextEncoder(),
+            TextEncoder(num_words),
             ImageEncoder(),
             ConcatABResidualBlocks(),
             ResidualBlock(),
