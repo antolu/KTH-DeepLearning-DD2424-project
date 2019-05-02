@@ -1,4 +1,4 @@
-from test.test_socket import HAVE_SOCKET_RDS
+# TAGAN implementation
 
 import torch
 import torch.nn
