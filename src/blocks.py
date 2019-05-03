@@ -210,6 +210,8 @@ class Generator(nn.Module):
         self.c = ResidualBlock()
         self.d = Decoder()
 
+        self.apply(initialize_parameters)
+
     def forward(self, xtext, ximage):
         a = self.a.forward(xtext)
         b = self.b.forward(ximage)
@@ -236,3 +238,16 @@ class Discriminator(nn.Module):
         tad = self.tad.forward(ie, te)
         d = self.d.forward(tad, uc)
         return d
+
+
+def initialize_parameters(model):
+    if isinstance(model, nn.Conv2d) or isinstance(model, nn.Linear):
+        if model.weight.requires_grad:
+            model.weight.data.normal_(std=0.02)
+        if model.bias is not None and model.bias.requires_grad:
+            model.bias.data.fill_(0)
+    elif isinstance(model, nn.BatchNorm2d) and model.affine:
+        if model.weight.requires_grad:
+            model.weight.data.normal_(1, 0.02)
+        if model.bias.requires_grad:
+            model.bias.data.fill_(0)
