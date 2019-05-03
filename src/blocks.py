@@ -211,7 +211,6 @@ class Generator(nn.Module):
         self.d = Decoder()
 
     def forward(self, xtext, ximage):
-        # x includes both the text and the image
         a = self.a.forward(xtext)
         b = self.b.forward(ximage)
         ab = self.ab.forward(a, b)
