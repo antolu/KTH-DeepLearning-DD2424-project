@@ -1,8 +1,28 @@
 from pycocotools.coco import COCO
 import numpy as np
 import scipy.ndimage
+import os
+import torchfile
 
-class parsecoco:
+import matplotlib
+matplotlib.use('tkagg')
+import matplotlib.pyplot as plt
+
+class CaptionTools:
+    def __init__(self) :
+        self.alphabet = "abcdefghijklmnopqrstuvwxyz0123456789-,;.!?:'\"/\\|_@#$%^&*~`+-=<>()[]{} "
+
+    def num2char(self, nums) :
+        char = ""
+        for num in nums :
+            char += self.alphabet[num-1]
+
+        return char
+
+class ParseCoco:
+    """
+    Reads and parses captions and images of the COCO dataset
+    """
     def __init__(self, data_root="datasets/coco") :
         self.data_root = data_root
 
@@ -102,7 +122,156 @@ class parsecoco:
 
         return image_array
 
+class ParseDatasets(CaptionTools) :
+    """
+    Class for reading and parsing CUB and oxford datasets
+    """
+    def __init__(self, images_root, captions_root) :
+        """
+        Initialises this class for one dataset
+        :param images_root The root directory of the images of this dataset
+        :param captions_root The root directory of then captions of this dataset
+        """
+        super().__init__()
+        self.images_root = images_root
+        self.captions_root = captions_root
 
-# class READCUB :
+    def read_all_captions(self) :
+        """
+        Reads all captions for this dataset (defined in init) into memory
+        :return Returns a dictionary where the key is the filename of the image, and the value is 
+                a dictionary with a key 'captions' whose value is list containing the image captions.
+                In essence: data_dict["<filename>"]["captions"] == <list of captions>
+                Also returns a list of all the classes the images are from.
+        """
 
+        if not os.path.exists(self.captions_root) :
+            raise "Path" + self.captions_root + "does not exist!"
+
+        # Find all folders of the captions
+        with open(os.path.join(self.captions_root, "allclasses.txt")) as f :
+            allclasses = [line.rstrip() for line in f]
+
+        data_dict = {}
+
+        # Iterate over all classes, convert num representation to chars
+        progress = 0.0
+        for dataclass in allclasses :
+            dataclass_dir = os.path.join(self.captions_root, dataclass)
+            for filename in os.listdir(dataclass_dir) :
+                filepath = os.path.join(dataclass_dir, filename)
+
+                captions = self.load_caption(filepath)
+
+                data_dict[os.path.splitext(filename)[0]] = {"captions": captions}
+            
+            progress += 1.0
+            print("Progress: ", round(progress/len(allclasses) * 100, 2), "%")
+
+        return data_dict, allclasses
+
+    def load_caption(self, filepath) :
+        """
+        Loads captions from a single file and returns them in a list
+        :param filepath The path to the caption file (.t7 format)
+        :return Returns a list of all the captions contained in the file
+        """
+        caption_data = torchfile.load(filepath)
+
+        caption_char_vec = caption_data.char # get the char vector in nums
+
+        captions = []
+        for i in range(caption_char_vec.shape[1]) :
+            caption = self.num2char(caption_char_vec[:, i]).rstrip()
+            captions.append(caption)
+
+        return captions
+
+    def read_all_images(self) :
+        """
+        Reads all images for this dataset (defined in init) into memory
+        :return Returns a dictionary where the key is the filename of the image, and the value is 
+                a dictionary with a key 'image' whose value is a 3D rgb array representing the image.
+                In essence: data_dict["<filename>"]["image"] == image array
+                Also returns a list of all the classes the images are from.
+        """
+        if not os.path.exists(self.images_root) :
+            raise "Path" + self.images_root + "does not exist!"
+
+        # Find all folders of the images
+        with open(os.path.join(self.images_root, "classes.txt")) as f :
+            allclasses = [line.split()[1].rstrip() for line in f]
+
+        data_dict = {}
+
+        # Iterate over all classes, convert num representation to chars
+        progress = 0.0
+        for dataclass in allclasses :
+            dataclass_dir = os.path.join(self.images_root, "images", dataclass)
+            for filename in os.listdir(dataclass_dir) :
+                filepath = os.path.join(dataclass_dir, filename)
+
+                image = self.load_image(filepath)
+
+                data_dict[os.path.splitext(filename)[0]] = {"image": image}
+            
+            progress += 1.0
+            print("Progress: ", round(progress/len(allclasses) * 100, 2), "%")
+
+        return data_dict, allclasses
+
+    def find_image_paths(self, data_dict) :
+        """
+        Finds path of all images for this dataset (defined in init) into memory
+        :param The data dictionary where each key is the name of a image/caption file
+        :return Returns a dictionary where the key is the filename of the image, just as the input
+                with an additional key-value pair in the child dictionary accessible as
+                data_dict["<filename>"]["imgpath"] = "/path/to/file.jpg"
+        """
+        if not os.path.exists(self.images_root) :
+            raise "Path" + self.images_root + "does not exist!"
+
+        # Find all folders of the images
+        with open(os.path.join(self.images_root, "classes.txt")) as f :
+            allclasses = [line.split()[1].rstrip() for line in f]
+
+        data_dict = {}
+
+        # Iterate over all classes, convert num representation to chars
+        progress = 0.0
+        for dataclass in allclasses :
+            dataclass_dir = os.path.join(self.images_root, "images", dataclass)
+            for filename in os.listdir(dataclass_dir) :
+                filepath = os.path.join(dataclass_dir, filename)
+
+                data_dict[os.path.splitext(filename)[0]] = {"imgpath": filepath}
+            
+            progress += 1.0
+            print("Progress: ", round(progress/len(allclasses) * 100, 2), "%")
+
+        return data_dict
+
+    def load_image(self, filepath) :
+        """
+        Reads all the image in `filepath` into memory
+        :param filepath The path of the file
+        :return An array representation of the image
+        """
+        img = scipy.ndimage.imread(filepath)
+        return img
+
+    def merge_captions_images(self, caps_dict, imgs_dict) :
+        """
+        Merges captions and data dicts
+        :param caps_dict The dictionary containing captions, as generated by read_all_captions above
+        :param imgs_dict The dictionary containing images, as generated by read_all_images above
+        """
+        merged_dict = {}
+        i = 0
+        for filename in caps_dict.keys() :
+            merged_dict[str(filename)] = caps_dict[str(filename)]
+            for key in imgs_dict[filename].keys() :
+                merged_dict[str(filename)][key] = imgs_dict[str(filename)][key]
+
+        return merged_dict
 
