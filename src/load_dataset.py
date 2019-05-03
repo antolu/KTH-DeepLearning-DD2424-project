@@ -2,7 +2,10 @@ from pycocotools.coco import COCO
 import numpy as np
 import scipy.ndimage
 
-class READCOCO:
+class parsecoco:
+    def __init__(self, data_root="datasets/coco") :
+        self.data_root = data_root
+
     def read_keywords(self):
         """
         Reads keywords we want the captions to contain from "caption_keywords.txt"
@@ -19,7 +22,6 @@ class READCOCO:
         Reads the training dataset annotations from disk
         :return: COCO objects for annotations and captions
         """
-        dataDir = 'coco'
         if set == 'train':
             dataType = 'train2017'
         elif set == 'val':
@@ -27,8 +29,8 @@ class READCOCO:
         else :
             raise "set option " + set + " was not recognized!"
 
-        captionFile = '{}/annotations/captions_{}.json'.format(dataDir, dataType)
-        annFile = '{}/annotations/instances_{}.json'.format(dataDir, dataType)
+        captionFile = '{}/annotations/captions_{}.json'.format(self.data_root, dataType)
+        annFile = '{}/annotations/instances_{}.json'.format(self.data_root, dataType)
 
         coco = COCO(annFile)
         coco_caps = COCO(captionFile)
@@ -53,6 +55,7 @@ class READCOCO:
         filteredImgs = {}
         sortedImgs = {}
 
+        # One image might have several captions, concatenate all captions of one image id to a single dict
         for img in anns:
             imgID = img['image_id']
 
@@ -65,6 +68,7 @@ class READCOCO:
             savedImg['captions'].append(caption)
             sortedImgs[imgID] = savedImg
 
+        # Go through all image captions, if at least one of the captions of an image contains a keyword, save the image and all captions of that image
         for imgID in sortedImgs:
 
             for caption in sortedImgs[imgID]['captions']:
@@ -74,19 +78,25 @@ class READCOCO:
 
         return filteredImgs
 
-    def load_image(self, image_id, set='train'):
-        dataDir = 'coco'
-        if set=='train' :
+    def load_image(self, image_id, dataset='train'):
+        """
+        Loads the image in `image_id` into memory as a 3D rgb array
+        :param image_id The image id (in integer form)
+        :param dataset, the dataset to load the image from. Valid values are 'train' and 'val'
+        :return Returns a 3D rgb array of the image
+        """
+
+        if dataset=='train' :
             dataType = 'train2017'
-        elif set=='val' :
+        elif dataset=='val' :
             dataType = 'val2017'
         else:
-            raise "set option " + set + " was not recognized!"
+            raise "set option " + dataset + " was not recognized!"
 
         image_id = str(image_id)
-        image_id += (13-len(image_id)) * "0" + ".jpg"
+        image_id = (12-len(image_id)) * "0" + image_id
 
-        image_file = '{}/{}/{}.json'.format(dataDir, dataType, image_id)
+        image_file = '{}/{}/{}.jpg'.format(self.data_root, dataType, image_id)
 
         image_array = scipy.ndimage.imread(image_file)
 
@@ -95,11 +105,4 @@ class READCOCO:
 
 # class READCUB :
 
-c = READCOCO()
 
-keywords = set(c.read_keywords())
-print("Keywords: ", keywords)
-coco, coco_caps = c.read_coco()
-
-filteredImgs = c.filter_coco(keywords, coco, coco_caps)
-print("Number of images containing one or several keywords:", len(filteredImgs))
