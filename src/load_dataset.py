@@ -49,7 +49,7 @@ class ParseCoco:
     def read_coco(self, set='train'):
         """
         Reads the training dataset annotations from disk
-        :return: COCO objects for annotations and captions
+        Saves coco objects in member variables for later use
         """
         if set == 'train':
             dataType = 'train2017'
@@ -72,7 +72,7 @@ class ParseCoco:
         :param keywords: A set of keywords, and each image caption should contain at least one of the keywords
         :param coco: The COCO dataset annotations
         :param coco_caps: The COCO dataset captions
-        :return: A dictionary with key corresponding to a an image ID, and the value is another dictionary where the "captions" key yields a list of the image captions
+        Saves filtered data as member variable
         """
         imgIds = self.coco.imgs.keys()
 
