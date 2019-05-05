@@ -118,7 +118,9 @@ class ConcatABResidualBlocks(nn.Module):
         )
 
     def forward(self, text_embed, image_embed):
-        self.main()
+        text_embed = text_embed[:, :, None, None].repeat(1, 1, image_embed.shape[2], image_embed.shape[3])
+        x = torch.cat((image_embed, text_embed), 1)
+        return self.main(x)
 
 
 class ResidualBlock(nn.Module):
@@ -164,19 +166,19 @@ class Decoder(nn.Module):
         self.main = nn.Sequential(
             OrderedDict(
                 [
-                    ("upsampling1", nn.Upsample((512, 32, 32), 2.0)),
+                    ("upsampling1", nn.Upsample(scale_factor=2)),
 
                     ("conv1", nn.Conv2d(512, 256, 3, 1, 1)),
                     ("bn1", nn.BatchNorm2d(256)),
                     ("relu1", nn.ReLU()),
 
-                    ("upsampling2", nn.Upsample((256, 64, 64), 2.0)),
+                    ("upsampling2", nn.Upsample(scale_factor=2)),
 
                     ("conv2", nn.Conv2d(256, 128, 3, 1, 1)),
                     ("bn2", nn.BatchNorm2d(128)),
                     ("relu2", nn.ReLU()),
 
-                    ("upsampling", nn.Upsample((128, 128, 128), 2.0)),
+                    ("upsampling3", nn.Upsample(scale_factor=2)),
 
                     ("conv3", nn.Conv2d(128, 64, 3, 1, 1)),
                     ("bn3", nn.BatchNorm2d(64)),
@@ -215,7 +217,8 @@ class Generator(nn.Module):
         a = self.a(xtext)
         b = self.b(ximage)
         ab = self.ab(a, b)
-        d = self.d(b + ab)
+        c = b + ab
+        d = self.d(c)
         return d
 
 
