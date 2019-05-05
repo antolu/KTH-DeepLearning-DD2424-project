@@ -235,24 +235,24 @@ class Discriminator(nn.Module):
 
         # IMAGE ENCODER
         self.conv3 = nn.Sequential(
-            nn.Conv2d(3, 64, 4, padding=2, bias=False),
+            nn.Conv2d(3, 64, 4, 2, padding=1, bias=False),
             nn.LeakyReLU(0.2, inplace=True), # I'm including this 'inplace' part since the example I am following has used it
-            nn.Conv2d(64, 128, 4, padding=2, bias=False),
+            nn.Conv2d(64, 128, 4, 2, padding=1, bias=False),
             nn.BatchNorm2d(128),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(128, 256, 4, padding=2, bias=False),
+            nn.Conv2d(128, 256, 4, 2, padding=1, bias=False),
             nn.BatchNorm2d(256),
             nn.LeakyReLU(0.2, inplace=True)
         )
 
         self.conv4 = nn.Sequential(
-            nn.Conv2d(256, 512, 4, padding=2, bias=False),
+            nn.Conv2d(256, 512, 4, 2, padding=1, bias=False),
             nn.BatchNorm2d(512),
             nn.LeakyReLU(0.2, inplace=True)
         )
 
         self.conv5 = nn.Sequential(
-            nn.Conv2d(512, 512, 4, padding=2, bias=False),
+            nn.Conv2d(512, 512, 4, 2, padding=1, bias=False),
             nn.BatchNorm2d(512),
             nn.LeakyReLU(0.2, inplace=True)
         )
@@ -306,8 +306,30 @@ class Discriminator(nn.Module):
         GAP_image1 = self.GAP1(image1)
         GAP_image2 = self.GAP2(image2)
         GAP_image3 = self.GAP3(image3)
-        #GAP_images = [GAP_image1, GAP_image2, GAP_image3]
+        GAP_images = [GAP_image1, GAP_image2, GAP_image3]
         d = self.un_disc(GAP_image3)
+
+        # Get word vectors (w), temporal avg(u) and multiply to get prod
+
+        # Calculate attentions
+        attn = nn.Softmax(prod)
+
+
+        beta = self.get_betas(w)
+
+        sum = 0
+
+        for j in range(3):
+            image = GAP_images[j]
+            W =  # How to genrerate W?
+            b = # How to generate b?
+
+            sum += nn.Sigmoid(torch.mm(W, image) + b) * beta[j]
+
+
+        f = f.
+
+
 
         return d
 
