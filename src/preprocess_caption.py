@@ -3,7 +3,7 @@ import fastText as ft
 from nltk.tokenize import RegexpTokenizer
 import torch
 
-class Preprocess :
+class PreprocessCaption :
     """
     Useful class to process captions in string form, to vector space representations
     """
@@ -30,7 +30,7 @@ class Preprocess :
         """
         return tokenizer.tokenize(sentence)
 
-    def caption_to_word_embedding(self, caption) :
+    def string_to_vector(self, caption) :
         """
         Converts captions to vector space representations using fasttext embeddings
         NOTE You have to execute the method `load_dataset` first, to load the fasttext embeddings
