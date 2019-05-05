@@ -10,12 +10,12 @@ class ConditioningAugmentation(nn.Module):
         super().__init__()
 
     def forward(self, mu, sigma):
-        return torch.randn(mu.shape) * sigma + mu  # TODO: use matrix multiplications
+        return torch.randn(mu.shape) * sigma + mu
 
 
 class TemporalAverage(nn.Module):
     def forward(self, x):
-        return x.mean()
+        return torch.mean(x, 1)
 
 class TextEncoderDiscriminator(nn.Module):
     pass
@@ -24,10 +24,8 @@ class TextEncoderDiscriminator(nn.Module):
 class TextEncoderGenerator(nn.Module):
     def __init__(self, num_words):
         super().__init__()
-        self.first = nn.Sequential(
-            nn.GRU(input_size=num_words*300, hidden_size=512, bidirectional=True),
-            TemporalAverage()
-        )
+        self.bgru = nn.GRU(input_size=300, hidden_size=256, bidirectional=True, batch_first=True)
+        self.avg = TemporalAverage()
         self.mu_cond_aug = nn.Sequential(
             OrderedDict(
                 [
@@ -49,9 +47,10 @@ class TextEncoderGenerator(nn.Module):
         self.cond_aug = ConditioningAugmentation()
 
     def forward(self, text):
-        first = self.first.forward(text)
-        mu = self.mu_cond_aug(first)
-        sigma = self.mu_cond_aug(first)
+        first = self.bgru(text)
+        avg = self.avg(first[0])
+        mu = self.mu_cond_aug(avg)
+        sigma = self.mu_cond_aug(avg)
         final = self.cond_aug(mu, sigma)
         return final
 
@@ -75,7 +74,7 @@ class ImageEncoderDiscriminator(nn.Module):
             ('act5', nn.LeakyReLU(0.2))]))
 
     def forward(self, im):
-        return self.main.forward(im)
+        return self.main(im)
 
 
 class ImageEncoderGenerator(nn.Module):
@@ -85,21 +84,21 @@ class ImageEncoderGenerator(nn.Module):
             ('conv1', nn.Conv2d(3, 64, 3, 1, 1)),
             ('act1', nn.ReLU()),
 
-            ('conv2', nn.Conv2d(64, 128, 4, 1, 2)),
+            ('conv2', nn.Conv2d(64, 128, 4, 2, 1)),
             ('bn2', nn.BatchNorm2d(128)),
             ('act2', nn.ReLU()),
 
-            ('conv3', nn.Conv2d(128, 256, 4, 1, 2)),
+            ('conv3', nn.Conv2d(128, 256, 4, 2, 1)),
             ('bn3', nn.BatchNorm2d(256)),
             ('act3', nn.ReLU()),
 
-            ('conv4', nn.Conv2d(256, 512, 4, 1, 2)),
+            ('conv4', nn.Conv2d(256, 512, 4, 2, 1)),
             ('bn4', nn.BatchNorm2d(512)),
             ('act4', nn.ReLU())
         ]))
 
     def forward(self, im):
-        return self.main.forward(im)
+        return self.main(im)
 
 
 class ConcatABResidualBlocks(nn.Module):
@@ -119,7 +118,7 @@ class ConcatABResidualBlocks(nn.Module):
         )
 
     def forward(self, text_embed, image_embed):
-        self.main.forward()
+        self.main()
 
 
 class ResidualBlock(nn.Module):
@@ -140,7 +139,7 @@ class ResidualBlock(nn.Module):
         )
 
     def forward(self, x):
-        c = self.main.forward(x)
+        c = self.main(x)
         return c + x
 
 
@@ -156,7 +155,7 @@ class UnconditionalDiscriminator(nn.Module):
             )
         )
     def forward(self, x):
-        return self.main.forward(x)
+        return self.main(x)
 
 
 class Decoder(nn.Module):
@@ -190,7 +189,7 @@ class Decoder(nn.Module):
         )
 
     def forward(self, x):
-        return self.main.forward(x)
+        return self.main(x)
 
 
 class TextAdaptiveDiscriminator(nn.Module):
@@ -207,18 +206,16 @@ class Generator(nn.Module):
         self.a = TextEncoderGenerator(num_words)
         self.b = ImageEncoderGenerator()
         self.ab = ConcatABResidualBlocks()
-        self.c = ResidualBlock()
         self.d = Decoder()
 
         self.apply(initialize_parameters)
 
     def forward(self, xtext, ximage):
         # x includes both the text and the image
-        a = self.a.forward(xtext)
-        b = self.b.forward(ximage)
-        ab = self.ab.forward(a, b)
-        c = self.c.forward(ab)
-        d = self.d.forward(b + c)
+        a = self.a(xtext)
+        b = self.b(ximage)
+        ab = self.ab(a, b)
+        d = self.d(b + ab)
         return d
 
 
