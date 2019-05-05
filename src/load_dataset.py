@@ -3,6 +3,7 @@ import numpy as np
 import scipy.ndimage
 import os
 import torchfile
+from scipy.io import loadmat
 
 import matplotlib
 matplotlib.use('tkagg')
@@ -13,6 +14,9 @@ class CaptionTools:
         self.alphabet = "abcdefghijklmnopqrstuvwxyz0123456789-,;.!?:'\"/\\|_@#$%^&*~`+-=<>()[]{} "
 
     def num2char(self, nums) :
+        """
+        Converts a vector in numerical for to character vector (for CUB and Oxford)
+        """
         char = ""
         for num in nums :
             char += self.alphabet[num-1]
@@ -22,25 +26,30 @@ class CaptionTools:
 class ParseCoco:
     """
     Reads and parses captions and images of the COCO dataset
+    The finished data dictionaries have the following form
+    self.data_dict = {<image id>:{"image_id":<image id>, "id":<real id>, "captions":<list of captions>}}
+    This class does NOT load images into the data dictionary due to the size of the dataset. Instead
+    call the load_image method with the image id to load individual files at runtime. 
     """
-    def __init__(self, data_root="datasets/coco") :
+    def __init__(self, data_root="datasets/coco", keywords_file="caption_keywords.txt") :
         self.data_root = data_root
+        self.keywords_file = keywords_file
 
     def read_keywords(self):
         """
         Reads keywords we want the captions to contain from "caption_keywords.txt"
         :return: A set of the keywords
         """
-        with open("caption_keywords.txt", "r") as f:
+        with open(self.keywords_file, "r") as f:
             keywords = [line[:len(line) - 1] for line in f]
 
-        return keywords
+        self.caption_keywords = keywords
 
 
     def read_coco(self, set='train'):
         """
         Reads the training dataset annotations from disk
-        :return: COCO objects for annotations and captions
+        Saves coco objects in member variables for later use
         """
         if set == 'train':
             dataType = 'train2017'
@@ -52,24 +61,23 @@ class ParseCoco:
         captionFile = '{}/annotations/captions_{}.json'.format(self.data_root, dataType)
         annFile = '{}/annotations/instances_{}.json'.format(self.data_root, dataType)
 
-        coco = COCO(annFile)
-        coco_caps = COCO(captionFile)
-
-        return coco, coco_caps
+        self.coco = COCO(annFile)
+        self.coco_caps = COCO(captionFile)
 
 
-    def filter_coco(self, keywords, coco, coco_caps):
+    def filter_coco(self):
         """
-        Finds the images in COCO dataset that contains one or several of the relevant keywords
+        Finds the images in COCO dataset that contains one or several of the relevant keywords.
+        Stores the resulting data dictionary as a member variable of this class called `data_dict`
         :param keywords: A set of keywords, and each image caption should contain at least one of the keywords
         :param coco: The COCO dataset annotations
         :param coco_caps: The COCO dataset captions
-        :return: A dictionary with key corresponding to a an image ID, and the value is another dictionary where the "captions" key yields a list of the image captions
+        Saves filtered data as member variable
         """
-        imgIds = coco.imgs.keys()
+        imgIds = self.coco.imgs.keys()
 
-        annIds = coco_caps.getAnnIds(imgIds=imgIds)  # [21616, 53212]
-        anns = coco_caps.loadAnns(
+        annIds = self.coco_caps.getAnnIds(imgIds=imgIds)  # [21616, 53212]
+        anns = self.coco_caps.loadAnns(
             annIds)  # [{'image_id': 540372, 'id': 300754, 'caption': 'A cow standing in an empty city block '}]
 
         filteredImgs = {}
@@ -92,11 +100,11 @@ class ParseCoco:
         for imgID in sortedImgs:
 
             for caption in sortedImgs[imgID]['captions']:
-                if len(set(caption.split()).intersection(keywords)) > 0:
+                if len(set(caption.split()).intersection(self.caption_keywords)) > 0:
                     filteredImgs[imgID] = sortedImgs[imgID]
                     break
 
-        return filteredImgs
+        self.data_dict = filteredImgs
 
     def load_image(self, image_id, dataset='train'):
         """
@@ -125,8 +133,10 @@ class ParseCoco:
 class ParseDatasets(CaptionTools) :
     """
     Class for reading and parsing CUB and oxford datasets
+    The resulting data dictionaries have the following structure
+    self.train_data = {<filename1>:{"imgpath":<path>, "captionpath":<path>, "img":<img>, "captions":<list of captions>} ... more filenames}
     """
-    def __init__(self, images_root, captions_root) :
+    def __init__(self, images_root, captions_root, dataset="cub") :
         """
         Initialises this class for one dataset
         :param images_root The root directory of the images of this dataset
@@ -135,40 +145,199 @@ class ParseDatasets(CaptionTools) :
         super().__init__()
         self.images_root = images_root
         self.captions_root = captions_root
-
-    def read_all_captions(self) :
-        """
-        Reads all captions for this dataset (defined in init) into memory
-        :return Returns a dictionary where the key is the filename of the image, and the value is 
-                a dictionary with a key 'captions' whose value is list containing the image captions.
-                In essence: data_dict["<filename>"]["captions"] == <list of captions>
-                Also returns a list of all the classes the images are from.
-        """
+        self.dataset = dataset
 
         if not os.path.exists(self.captions_root) :
             raise "Path" + self.captions_root + "does not exist!"
+        
+        if not os.path.exists(self.images_root) :
+            raise "Path" + self.images_root + "does not exist!"
 
-        # Find all folders of the captions
+        self.read_data_paths()
+
+
+    def read_data_paths(self) :
+        """
+        Finds path of all images and captions for this dataset (defined in init) into memory
+        Saves the dictionaries `train_data` and `test_data` as member variables
+        """
+
+        # Find all folders of the images
+        if self.dataset=="cub" :
+            with open(os.path.join(self.images_root, "classes.txt")) as f :
+                allclasses = [line.split()[1].rstrip() for line in f]
+
+            # Be able to convert image id to image name
+            imgId_to_filename = {}
+            filename_to_imgId = {}
+            with open(os.path.join(self.images_root, "images.txt")) as f :
+                for line in f:
+                    line = line.rstrip()
+                    imgId, path = line.split()
+                    filename = os.path.splitext(os.path.split(path)[1])[0]
+                    imgId_to_filename[imgId] = filename
+                    filename_to_imgId[filename] = imgId
+
+            # Find data splits
+            data_split = {}
+            with open(os.path.join(self.images_root, "train_test_split.txt")) as f :
+                for line in f :
+                    imgId, traintest = line.split()
+                    data_split[imgId] = traintest
+
+        elif self.dataset=="oxford" :
+            data_split = {}
+            imgId_to_filename = {}
+            filename_to_imgId = {}
+
+            split = loadmat(os.path.join(self.images_root, "setid.mat"))
+
+            train_ids = split["trnid"][0]
+            val_ids = split["valid"][0]
+            test_ids = split["tstid"][0]
+
+            for imgId in train_ids :
+                imgId = str(imgId)
+
+                filename = "image_" + ((5-len(imgId)) * "0") + imgId
+                imgId_to_filename[str(imgId)] = filename
+                filename_to_imgId[filename] = str(imgId)
+
+                data_split[str(imgId)] = "1"
+            
+            for imgId in val_ids :
+                imgId = str(imgId)
+
+                filename = "image_" + ((5-len(imgId)) * "0") + imgId
+                imgId_to_filename[imgId] = filename
+                filename_to_imgId[filename] = imgId
+
+                data_split[imgId] = "2"
+
+            for imgId in test_ids :
+                imgId = str(imgId)
+
+                filename = "image_" + ((5-len(imgId)) * "0") + imgId
+                imgId_to_filename[imgId] = filename
+                filename_to_imgId[filename] = imgId
+
+                data_split[imgId] = "0"
+
+        train_data = {}
+        val_data = {}
+        test_data = {}
+
+        # Find paths of the image files
+        if self.dataset == "cub" :
+            for dataclass in allclasses :
+                dataclass_dir = os.path.join(self.images_root, "images", dataclass)
+                for filename in os.listdir(dataclass_dir) :
+                    filepath = os.path.join(dataclass_dir, filename)
+
+                    filename = os.path.splitext(filename)[0]
+                    imgId = filename_to_imgId[filename]
+                    if data_split[imgId] == "1" :
+                        train_data[filename] = {"imgpath": filepath}
+                    elif data_split[imgId] == "2" :
+                        val_data[filename] = {"imgpath": filepath}
+                    elif data_split[imgId] == "0" :
+                        test_data[filename] = {"imgpath": filepath}
+        elif self.dataset == "oxford" :
+            for filename in os.listdir(self.images_root) :
+                filepath = os.path.join(self.images_root, filename)
+
+                if filename == "setid.mat":
+                    continue
+
+                filename = os.path.splitext(filename)[0]
+                
+                imgId = filename_to_imgId[filename]
+                if data_split[imgId] == "1" :
+                    train_data[filename] = {"imgpath": filepath}
+                elif data_split[imgId] == "2" :
+                    val_data[filename] = {"imgpath": filepath}
+                elif data_split[imgId] == "0" :
+                    test_data[filename] = {"imgpath": filepath}
+
         with open(os.path.join(self.captions_root, "allclasses.txt")) as f :
             allclasses = [line.rstrip() for line in f]
 
-        data_dict = {}
-
-        # Iterate over all classes, convert num representation to chars
-        progress = 0.0
+        # Find paths of the captions files
         for dataclass in allclasses :
             dataclass_dir = os.path.join(self.captions_root, dataclass)
             for filename in os.listdir(dataclass_dir) :
                 filepath = os.path.join(dataclass_dir, filename)
 
-                captions = self.load_caption(filepath)
+                filename = os.path.splitext(filename)[0]
+                imgId = filename_to_imgId[filename]
+                if data_split[imgId] == "1":
+                    train_data[filename]["captionpath"] = filepath
+                elif data_split[imgId] == "2":
+                    val_data[filename]["captionpath"] = filepath
+                elif data_split[imgId] == "0":
+                    test_data[filename]["captionpath"] = filepath
 
-                data_dict[os.path.splitext(filename)[0]] = {"captions": captions}
-            
+        self.data_split = data_split
+        self.imgId_to_filename = imgId_to_filename
+        self.filename_to_imgId = filename_to_imgId
+        self.train_data = train_data
+        self.val_data = val_data
+        self.test_data = test_data
+
+    def read_all_captions(self) :
+        """
+        Reads all captions for this dataset (defined in init) into memory
+        Saves the captions into the member variables `train_data` and `test_data`
+        """
+
+        progress = 0.0
+        for filename in self.train_data.keys() :
+            self.train_data[filename]["captions"] = self.load_caption(self.train_data[filename]["captionpath"])
             progress += 1.0
-            print("Progress: ", round(progress/len(allclasses) * 100, 2), "%")
+            if progress % 100 == 0:
+                print("Training caption loading progress: ", round(progress/len(self.train_data) * 100, 2), "%")
 
-        return data_dict, allclasses
+        progress = 0.0
+        for filename in self.val_data.keys() :
+            self.val_data[filename]["captions"] = self.load_caption(self.val_data[filename]["captionpath"])
+            progress += 1.0
+            if progress % 100 == 0:
+                print("Training caption loading progress: ", round(progress/len(self.val_data) * 100, 2), "%")
+
+        progress = 0.0
+        for filename in self.test_data.keys() :
+            self.test_data[filename]["captions"] = self.load_caption(self.test_data[filename]["captionpath"])
+            progress += 1.0
+            if progress % 100 == 0:
+                print("Test caption loading progress: ", round(progress/len(self.test_data) * 100, 2), "%")
+
+
+    def read_all_images(self) :
+        """
+        Reads all images for this dataset (defined in init) into memory
+        Saves the images into the member variables `train_data` and `test_data`
+        """
+        progress = 0.0
+        for filename in self.train_data.keys() :
+            self.train_data[filename]["img"] = self.load_image(self.train_data[filename]["imgpath"])
+            progress += 1.0
+            if progress % 100 == 0:
+                print("Training image loading progress: ", round(progress/len(self.train_data) * 100, 2), "%")
+
+        progress = 0.0
+        for filename in self.val_data.keys() :
+            self.val_data[filename]["img"] = self.load_image(self.val_data[filename]["imgpath"])
+            progress += 1.0
+            if progress % 100 == 0:
+                print("Validation image loading progress: ", round(progress/len(self.val_data) * 100, 2), "%")
+
+        progress = 0.0
+        for filename in self.test_data.keys() :
+            self.test_data[filename]["img"] = self.load_image(self.test_data[filename]["imgpath"])
+            progress += 1.0
+            if progress % 100 == 0:
+                print("Test image loading progress: ", round(progress/len(self.test_data) * 100, 2), "%")
+
 
     def load_caption(self, filepath) :
         """
@@ -187,69 +356,6 @@ class ParseDatasets(CaptionTools) :
 
         return captions
 
-    def read_all_images(self) :
-        """
-        Reads all images for this dataset (defined in init) into memory
-        :return Returns a dictionary where the key is the filename of the image, and the value is 
-                a dictionary with a key 'image' whose value is a 3D rgb array representing the image.
-                In essence: data_dict["<filename>"]["image"] == image array
-                Also returns a list of all the classes the images are from.
-        """
-        if not os.path.exists(self.images_root) :
-            raise "Path" + self.images_root + "does not exist!"
-
-        # Find all folders of the images
-        with open(os.path.join(self.images_root, "classes.txt")) as f :
-            allclasses = [line.split()[1].rstrip() for line in f]
-
-        data_dict = {}
-
-        # Iterate over all classes, convert num representation to chars
-        progress = 0.0
-        for dataclass in allclasses :
-            dataclass_dir = os.path.join(self.images_root, "images", dataclass)
-            for filename in os.listdir(dataclass_dir) :
-                filepath = os.path.join(dataclass_dir, filename)
-
-                image = self.load_image(filepath)
-
-                data_dict[os.path.splitext(filename)[0]] = {"image": image}
-            
-            progress += 1.0
-            print("Progress: ", round(progress/len(allclasses) * 100, 2), "%")
-
-        return data_dict, allclasses
-
-    def find_image_paths(self, data_dict) :
-        """
-        Finds path of all images for this dataset (defined in init) into memory
-        :param The data dictionary where each key is the name of a image/caption file
-        :return Returns a dictionary where the key is the filename of the image, just as the input
-                with an additional key-value pair in the child dictionary accessible as
-                data_dict["<filename>"]["imgpath"] = "/path/to/file.jpg"
-        """
-        if not os.path.exists(self.images_root) :
-            raise "Path" + self.images_root + "does not exist!"
-
-        # Find all folders of the images
-        with open(os.path.join(self.images_root, "classes.txt")) as f :
-            allclasses = [line.split()[1].rstrip() for line in f]
-
-        data_dict = {}
-
-        # Iterate over all classes, convert num representation to chars
-        progress = 0.0
-        for dataclass in allclasses :
-            dataclass_dir = os.path.join(self.images_root, "images", dataclass)
-            for filename in os.listdir(dataclass_dir) :
-                filepath = os.path.join(dataclass_dir, filename)
-
-                data_dict[os.path.splitext(filename)[0]] = {"imgpath": filepath}
-            
-            progress += 1.0
-            print("Progress: ", round(progress/len(allclasses) * 100, 2), "%")
-
-        return data_dict
 
     def load_image(self, filepath) :
         """
@@ -259,19 +365,3 @@ class ParseDatasets(CaptionTools) :
         """
         img = scipy.ndimage.imread(filepath)
         return img
-
-    def merge_captions_images(self, caps_dict, imgs_dict) :
-        """
-        Merges captions and data dicts
-        :param caps_dict The dictionary containing captions, as generated by read_all_captions above
-        :param imgs_dict The dictionary containing images, as generated by read_all_images above
-        """
-        merged_dict = {}
-        i = 0
-        for filename in caps_dict.keys() :
-            merged_dict[str(filename)] = caps_dict[str(filename)]
-            for key in imgs_dict[filename].keys() :
-                merged_dict[str(filename)][key] = imgs_dict[str(filename)][key]
-
-        return merged_dict
-
