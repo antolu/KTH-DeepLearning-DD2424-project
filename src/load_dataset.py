@@ -4,6 +4,9 @@ import scipy.ndimage
 import os
 import torchfile
 from scipy.io import loadmat
+# from preprocess_caption import PreprocessCaption
+
+import torch.utils.data as data
 
 import matplotlib
 matplotlib.use('tkagg')
@@ -23,19 +26,108 @@ class CaptionTools:
 
         return char
 
-class ParseCoco:
+# class ParseCoco:
+#     """
+#     Reads and parses captions and images of the COCO dataset
+#     The finished data dictionaries have the following form
+#     self.data_dict = {<image id>:{"image_id":<image id>, "id":<real id>, "captions":<list of captions>}}
+#     This class does NOT load images into the data dictionary due to the size of the dataset. Instead
+#     call the load_image method with the image id to load individual files at runtime. 
+#     """
+#     def __init__(self, data_root="datasets/coco", keywords_file="caption_keywords.txt", dataset="train") :
+#         self.data_root = data_root
+#         self.keywords_file = keywords_file
+
+#         self.__read_keywords()
+#         self.__read_coco(set=dataset)
+#         self.__filter_coco()
+
+
+
+#     def load_image(self, image_id, dataset='train'):
+#         """
+#         Loads the image in `image_id` into memory as a 3D rgb array
+#         :param image_id The image id (in integer form)
+#         :param dataset, the dataset to load the image from. Valid values are 'train' and 'val'
+#         :return Returns a 3D rgb array of the image
+#         """
+
+#         if dataset=='train' :
+#             dataType = 'train2017'
+#         elif dataset=='val' :
+#             dataType = 'val2017'
+#         else:
+#             raise "set option " + dataset + " was not recognized!"
+
+#         image_id = str(image_id)
+#         image_id = (12-len(image_id)) * "0" + image_id
+
+#         image_file = '{}/{}/{}.jpg'.format(self.data_root, dataType, image_id)
+
+#         image_array = scipy.ndimage.imread(image_file)
+
+#         return image_array
+
+#     def __get_imagepath(self, image_id, dataset="train") :
+#         if dataset=='train' :
+#             dataType = 'train2017'
+#         elif dataset=='val' :
+#             dataType = 'val2017'
+#         elif dataset=='test' :
+#             dataType = 'test2017'
+#         else:
+#             raise "set option " + dataset + " was not recognized!"
+
+#         image_id = str(image_id)
+#         image_id = (12-len(image_id)) * "0" + image_id
+
+#         image_path = '{}/{}/{}.jpg'.format(self.data_root, dataType, image_id)
+
+#         return image_path
+
+
+class ParseDatasets(CaptionTools) :
     """
-    Reads and parses captions and images of the COCO dataset
-    The finished data dictionaries have the following form
-    self.data_dict = {<image id>:{"image_id":<image id>, "id":<real id>, "captions":<list of captions>}}
-    This class does NOT load images into the data dictionary due to the size of the dataset. Instead
-    call the load_image method with the image id to load individual files at runtime. 
+    Class for reading and parsing CUB and oxford datasets
+    The resulting data dictionaries have the following structure
+    self.train_data = {<filename1>:{"imgpath":<path>, "captionpath":<path>, "img":<img>, "captions":<list of captions>} ... more filenames}
     """
-    def __init__(self, data_root="datasets/coco", keywords_file="caption_keywords.txt") :
-        self.data_root = data_root
+    def __init__(self, images_root="", captions_root="", dataset_root="", dataset="cub", keywords_file="caption_keywords.txt", data_set="train", max_no_words=50, preprocess_caption=None) :
+        """
+        Initialises this class for one dataset
+        :param images_root The root directory of the images of this dataset
+        :param captions_root The root directory of then captions of this dataset
+        """
+        super().__init__()
+        self.images_root = images_root
+        self.captions_root = captions_root
+        self.dataset_root = dataset_root
+        self.data_set = data_set
+
+        self.max_no_words = max_no_words
+        self.preprocess_caption = preprocess_caption
+
         self.keywords_file = keywords_file
 
-    def read_keywords(self):
+        self.train = None
+        self.val = None
+        self.test = None
+
+        if dataset != "coco" :
+            if not os.path.exists(self.captions_root) :
+                raise "Path" + self.captions_root + "does not exist!"
+            
+            if not os.path.exists(self.images_root) :
+                raise "Path" + self.images_root + "does not exist!"
+
+            self.read_data_paths()
+        else :
+            self.__read_coco_keywords()
+            self.__read_coco_annotations(set=data_set)
+            self.__filter_coco_annotations()
+
+
+    def __read_coco_keywords(self):
         """
         Reads keywords we want the captions to contain from "caption_keywords.txt"
         :return: A set of the keywords
@@ -46,7 +138,7 @@ class ParseCoco:
         self.caption_keywords = keywords
 
 
-    def read_coco(self, set='train'):
+    def __read_coco_annotations(self, set='train'):
         """
         Reads the training dataset annotations from disk
         Saves coco objects in member variables for later use
@@ -55,17 +147,19 @@ class ParseCoco:
             dataType = 'train2017'
         elif set == 'val':
             dataType = 'val2017'
+        elif set == 'test' :
+            dataType =  'test2017'
         else :
             raise "set option " + set + " was not recognized!"
 
-        captionFile = '{}/annotations/captions_{}.json'.format(self.data_root, dataType)
-        annFile = '{}/annotations/instances_{}.json'.format(self.data_root, dataType)
+        captionFile = '{}/annotations/captions_{}.json'.format(self.dataset_root, dataType)
+        annFile = '{}/annotations/instances_{}.json'.format(self.dataset_root, dataType)
 
         self.coco = COCO(annFile)
         self.coco_caps = COCO(captionFile)
 
 
-    def filter_coco(self):
+    def __filter_coco_annotations(self):
         """
         Finds the images in COCO dataset that contains one or several of the relevant keywords.
         Stores the resulting data dictionary as a member variable of this class called `data_dict`
@@ -90,7 +184,7 @@ class ParseCoco:
             if imgID in sortedImgs:
                 savedImg = sortedImgs[imgID]
             else:
-                savedImg = {'image_id': imgID, 'id': img['id'], 'captions': []}
+                savedImg = {'image_id': imgID, 'id': img['id'], 'captions': [], 'imgpath':self.__get_imagepath(imgID)}
 
             caption = img['caption']
             savedImg['captions'].append(caption)
@@ -106,55 +200,30 @@ class ParseCoco:
 
         self.data_dict = filteredImgs
 
-    def load_image(self, image_id, dataset='train'):
-        """
-        Loads the image in `image_id` into memory as a 3D rgb array
-        :param image_id The image id (in integer form)
-        :param dataset, the dataset to load the image from. Valid values are 'train' and 'val'
-        :return Returns a 3D rgb array of the image
-        """
+        if self.data_set == 'train':
+            self.train = Dataset(filteredImgs, self.preprocess_caption, self.max_no_words)
+        elif self.data_set == 'val':
+            self.val = Dataset(filteredImgs, self.preprocess_caption, self.max_no_words)
+        elif self.data_set == 'test' :
+            self.test = Dataset(filteredImgs, self.preprocess_caption, self.max_no_words)
+        
 
+    def __get_imagepath(self, image_id, dataset="train") :
         if dataset=='train' :
             dataType = 'train2017'
         elif dataset=='val' :
             dataType = 'val2017'
+        elif dataset=='test' :
+            dataType = 'test2017'
         else:
             raise "set option " + dataset + " was not recognized!"
 
         image_id = str(image_id)
         image_id = (12-len(image_id)) * "0" + image_id
 
-        image_file = '{}/{}/{}.jpg'.format(self.data_root, dataType, image_id)
+        image_path = '{}/{}/{}.jpg'.format(self.dataset_root, dataType, image_id)
 
-        image_array = scipy.ndimage.imread(image_file)
-
-        return image_array
-
-class ParseDatasets(CaptionTools) :
-    """
-    Class for reading and parsing CUB and oxford datasets
-    The resulting data dictionaries have the following structure
-    self.train_data = {<filename1>:{"imgpath":<path>, "captionpath":<path>, "img":<img>, "captions":<list of captions>} ... more filenames}
-    """
-    def __init__(self, images_root, captions_root, dataset="cub") :
-        """
-        Initialises this class for one dataset
-        :param images_root The root directory of the images of this dataset
-        :param captions_root The root directory of then captions of this dataset
-        """
-        super().__init__()
-        self.images_root = images_root
-        self.captions_root = captions_root
-        self.dataset = dataset
-
-        if not os.path.exists(self.captions_root) :
-            raise "Path" + self.captions_root + "does not exist!"
-        
-        if not os.path.exists(self.images_root) :
-            raise "Path" + self.images_root + "does not exist!"
-
-        self.read_data_paths()
-
+        return image_path
 
     def read_data_paths(self) :
         """
@@ -242,6 +311,7 @@ class ParseDatasets(CaptionTools) :
                         val_data[filename] = {"imgpath": filepath}
                     elif data_split[imgId] == "0" :
                         test_data[filename] = {"imgpath": filepath}
+
         elif self.dataset == "oxford" :
             for filename in os.listdir(self.images_root) :
                 filepath = os.path.join(self.images_root, filename)
@@ -283,6 +353,10 @@ class ParseDatasets(CaptionTools) :
         self.train_data = train_data
         self.val_data = val_data
         self.test_data = test_data
+
+        self.train = Dataset(train_data, self.preprocess_caption, self.max_no_words)
+        self.val = Dataset(val_data, self.preprocess_caption, self.max_no_words)
+        self.test = Dataset(test_data, self.preprocess_caption, self.max_no_words)
 
     def read_all_captions(self) :
         """
@@ -365,3 +439,46 @@ class ParseDatasets(CaptionTools) :
         """
         img = scipy.ndimage.imread(filepath)
         return img
+
+
+    def get_datasets(self) :
+        return self.train, self.val, self.test
+
+
+class Dataset(data.Dataset, ParseDatasets) :
+    """
+    Base class for datasets inheriting the pytorch dataloader Dataset interface
+    """
+
+    def __init__(self, data_dict, preprocess_caption, max_no_words=50) :
+        self.data = data_dict
+        self.keys = list(data_dict.keys())
+        self.max_no_words = max_no_words
+
+        self.pc = preprocess_caption
+
+    def __len__(self) :
+        return len(self.data)
+
+    def __getitem__(self, i) :
+        imgId = self.keys[i]
+
+        data = self.data[imgId]
+
+        if "captions" not in data :
+            data["captions"] = self.load_caption(data["caption_path"])
+        if "img" not in data : 
+            data["img"] = self.load_image(data["imgpath"])
+
+        img = data["img"]
+        ################################
+        # Need to do transforms
+        ################################
+
+        captions = data["captions"]
+
+        rand_caption = captions[np.random.choice(len(captions))]
+
+        caption_vector, no_words = self.pc.string_to_vector(rand_caption, self.max_no_words)
+
+        return img, caption_vector, no_words, cap_text

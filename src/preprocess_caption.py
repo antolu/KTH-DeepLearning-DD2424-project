@@ -28,7 +28,7 @@ class PreprocessCaption :
         :param sentence The sentence to tokenize
         :return A list of string tokens
         """
-        return tokenizer.tokenize(sentence)
+        return self.tokenizer.tokenize(sentence)
 
     def string_to_vector(self, caption, max_no_words=50) :
         """
