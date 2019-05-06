@@ -430,6 +430,9 @@ class Discriminator(nn.Module):
         total = 0
         total_neg = 0
 
+        idx = np.arange(0, image.size(0))
+        idx_neg = torch.tensor(np.roll(idx, 1))
+
         for j in range(3):
             image = GAP_images[j]
             image = image.mean(-1).mean(-1).unsqueeze(-1)
@@ -439,21 +442,21 @@ class Discriminator(nn.Module):
             else:
                 Wb = self.get_Wb2(words_embs)
 
-            W = Wb[:, :, :-1]  # should have dimensions (batch_size, num_words, 256 or 512 [depending on j])
-            b = Wb[:, :, -1].unsqueeze(-1)  # should have dimensions (batch_size, num_words, 1)
+            W = Wb[:, :, :-1]
+            b = Wb[:, :, -1].unsqueeze(-1)
 
             if negative:
-                #TODO: get W_neg and b_neg and betas_neg
+                W_neg = W[idx_neg]
+                b_neg = b[idx_neg]
                 f_neg = torch.sigmoid(torch.bmm(W_neg, image) + b_neg).squeeze(-1)
-                total_neg += f_neg * betas[:, :, j]  # indexing for betas is wrong total_neg should have dimensions (batch_size, num_words)
+                total_neg += f_neg * betas[idx_neg, j]
             f = torch.sigmoid(torch.bmm(W, image) + b).squeeze(-1)
-            total += f * betas[:, :, j]  # total should have dimensions (batch_size, num_words)
+            total += f * betas[:, :, j]
 
         if negative:
-            #TODO: get alphas_neg
-            alphas_neg = alphas  # need to change this
-            total_neg = total_neg.t().pow(alphas_neg).prod(0)  # total_neg should be (batch_size)
-        total = total.t().pow(alphas).prod(0)  # total should be (batch_size)
+            alphas_neg = alphas[idx_neg, :]  # need to change this
+            total_neg = total_neg.t().pow(alphas_neg.t()).prod(0)  # total_neg should be (batch_size)
+        total = total.t().pow(alphas.t()).prod(0)  # total should be (batch_size)
 
         if negative:
             return d, total, total_neg
