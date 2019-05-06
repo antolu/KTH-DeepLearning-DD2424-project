@@ -1,98 +1,20 @@
 from pycocotools.coco import COCO
 import numpy as np
-import scipy.ndimage
 import os
 import torchfile
 from scipy.io import loadmat
-# from preprocess_caption import PreprocessCaption
+from PIL import Image
 
 import torch.utils.data as data
+from torchvision import transforms
 
-import matplotlib
-matplotlib.use('tkagg')
-import matplotlib.pyplot as plt
-
-class CaptionTools:
-    def __init__(self) :
-        self.alphabet = "abcdefghijklmnopqrstuvwxyz0123456789-,;.!?:'\"/\\|_@#$%^&*~`+-=<>()[]{} "
-
-    def num2char(self, nums) :
-        """
-        Converts a vector in numerical for to character vector (for CUB and Oxford)
-        """
-        char = ""
-        for num in nums :
-            char += self.alphabet[num-1]
-
-        return char
-
-# class ParseCoco:
-#     """
-#     Reads and parses captions and images of the COCO dataset
-#     The finished data dictionaries have the following form
-#     self.data_dict = {<image id>:{"image_id":<image id>, "id":<real id>, "captions":<list of captions>}}
-#     This class does NOT load images into the data dictionary due to the size of the dataset. Instead
-#     call the load_image method with the image id to load individual files at runtime. 
-#     """
-#     def __init__(self, data_root="datasets/coco", keywords_file="caption_keywords.txt", dataset="train") :
-#         self.data_root = data_root
-#         self.keywords_file = keywords_file
-
-#         self.__read_keywords()
-#         self.__read_coco(set=dataset)
-#         self.__filter_coco()
-
-
-
-#     def load_image(self, image_id, dataset='train'):
-#         """
-#         Loads the image in `image_id` into memory as a 3D rgb array
-#         :param image_id The image id (in integer form)
-#         :param dataset, the dataset to load the image from. Valid values are 'train' and 'val'
-#         :return Returns a 3D rgb array of the image
-#         """
-
-#         if dataset=='train' :
-#             dataType = 'train2017'
-#         elif dataset=='val' :
-#             dataType = 'val2017'
-#         else:
-#             raise "set option " + dataset + " was not recognized!"
-
-#         image_id = str(image_id)
-#         image_id = (12-len(image_id)) * "0" + image_id
-
-#         image_file = '{}/{}/{}.jpg'.format(self.data_root, dataType, image_id)
-
-#         image_array = scipy.ndimage.imread(image_file)
-
-#         return image_array
-
-#     def __get_imagepath(self, image_id, dataset="train") :
-#         if dataset=='train' :
-#             dataType = 'train2017'
-#         elif dataset=='val' :
-#             dataType = 'val2017'
-#         elif dataset=='test' :
-#             dataType = 'test2017'
-#         else:
-#             raise "set option " + dataset + " was not recognized!"
-
-#         image_id = str(image_id)
-#         image_id = (12-len(image_id)) * "0" + image_id
-
-#         image_path = '{}/{}/{}.jpg'.format(self.data_root, dataType, image_id)
-
-#         return image_path
-
-
-class ParseDatasets(CaptionTools) :
+class ParseDatasets :
     """
     Class for reading and parsing CUB and oxford datasets
     The resulting data dictionaries have the following structure
     self.train_data = {<filename1>:{"imgpath":<path>, "captionpath":<path>, "img":<img>, "captions":<list of captions>} ... more filenames}
     """
-    def __init__(self, images_root="", captions_root="", dataset_root="", dataset="cub", keywords_file="caption_keywords.txt", data_set="train", max_no_words=50, preprocess_caption=None) :
+    def __init__(self, images_root="", captions_root="", dataset_root="", dataset="cub", keywords_file="caption_keywords.txt", data_set="train", max_no_words=50, preprocess_caption=None, transform=None) :
         """
         Initialises this class for one dataset
         :param images_root The root directory of the images of this dataset
@@ -102,10 +24,16 @@ class ParseDatasets(CaptionTools) :
         self.images_root = images_root
         self.captions_root = captions_root
         self.dataset_root = dataset_root
+        self.dataset = dataset
         self.data_set = data_set
 
         self.max_no_words = max_no_words
         self.preprocess_caption = preprocess_caption
+        
+        if transform == None :
+            self.transform = transforms.ToTensor()
+        else :
+            self.transform = transform
 
         self.keywords_file = keywords_file
 
@@ -201,11 +129,11 @@ class ParseDatasets(CaptionTools) :
         self.data_dict = filteredImgs
 
         if self.data_set == 'train':
-            self.train = Dataset(filteredImgs, self.preprocess_caption, self.max_no_words)
+            self.train = Dataset(filteredImgs, self.preprocess_caption, self.max_no_words, self.transform)
         elif self.data_set == 'val':
-            self.val = Dataset(filteredImgs, self.preprocess_caption, self.max_no_words)
+            self.val = Dataset(filteredImgs, self.preprocess_caption, self.max_no_words, self.transform)
         elif self.data_set == 'test' :
-            self.test = Dataset(filteredImgs, self.preprocess_caption, self.max_no_words)
+            self.test = Dataset(filteredImgs, self.preprocess_caption, self.max_no_words, self.transform)
         
 
     def __get_imagepath(self, image_id, dataset="train") :
@@ -224,6 +152,9 @@ class ParseDatasets(CaptionTools) :
         image_path = '{}/{}/{}.jpg'.format(self.dataset_root, dataType, image_id)
 
         return image_path
+
+    # def __initiate_transforms(self) :
+
 
     def read_data_paths(self) :
         """
@@ -354,9 +285,9 @@ class ParseDatasets(CaptionTools) :
         self.val_data = val_data
         self.test_data = test_data
 
-        self.train = Dataset(train_data, self.preprocess_caption, self.max_no_words)
-        self.val = Dataset(val_data, self.preprocess_caption, self.max_no_words)
-        self.test = Dataset(test_data, self.preprocess_caption, self.max_no_words)
+        self.train = Dataset(train_data, self.preprocess_caption, self.max_no_words, self.transform)
+        self.val = Dataset(val_data, self.preprocess_caption, self.max_no_words, self.transform)
+        self.test = Dataset(test_data, self.preprocess_caption, self.max_no_words, self.transform)
 
     def read_all_captions(self) :
         """
@@ -425,7 +356,7 @@ class ParseDatasets(CaptionTools) :
 
         captions = []
         for i in range(caption_char_vec.shape[1]) :
-            caption = self.num2char(caption_char_vec[:, i]).rstrip()
+            caption = self.pc.num2char(caption_char_vec[:, i]).rstrip()
             captions.append(caption)
 
         return captions
@@ -437,7 +368,7 @@ class ParseDatasets(CaptionTools) :
         :param filepath The path of the file
         :return An array representation of the image
         """
-        img = scipy.ndimage.imread(filepath)
+        img = Image.open(filepath)
         return img
 
 
@@ -450,12 +381,13 @@ class Dataset(data.Dataset, ParseDatasets) :
     Base class for datasets inheriting the pytorch dataloader Dataset interface
     """
 
-    def __init__(self, data_dict, preprocess_caption, max_no_words=50) :
+    def __init__(self, data_dict, preprocess_caption, max_no_words=50, transform=None) :
         self.data = data_dict
         self.keys = list(data_dict.keys())
         self.max_no_words = max_no_words
 
         self.pc = preprocess_caption
+        self.transform = transform
 
     def __len__(self) :
         return len(self.data)
@@ -466,19 +398,21 @@ class Dataset(data.Dataset, ParseDatasets) :
         data = self.data[imgId]
 
         if "captions" not in data :
-            data["captions"] = self.load_caption(data["caption_path"])
+            captions = self.load_caption(data["captionpath"])
+        else :
+            captions = data["captions"]
+
         if "img" not in data : 
-            data["img"] = self.load_image(data["imgpath"])
+            img = self.load_image(data["imgpath"])
+        else :
+            img = data["img"]
 
-        img = data["img"]
-        ################################
-        # Need to do transforms
-        ################################
-
-        captions = data["captions"]
+        tnsr_img = self.transform(img)
 
         rand_caption = captions[np.random.choice(len(captions))]
 
         caption_vector, no_words = self.pc.string_to_vector(rand_caption, self.max_no_words)
 
-        return img, caption_vector, no_words, cap_text
+        ret = {"img":img, "tensor":tnsr_img, "caption_vector":caption_vector, "no_words":no_words, "caption":rand_caption}
+
+        return ret

@@ -2,6 +2,7 @@ import numpy as np
 import fastText as ft
 from nltk.tokenize import RegexpTokenizer
 import torch
+import time
 
 class PreprocessCaption :
     """
@@ -11,14 +12,16 @@ class PreprocessCaption :
         self.fasttext_file = fasttext_file
         self.tokenizer = RegexpTokenizer("\\w+")
         self.fasttext_loaded = False
+        self.alphabet = "abcdefghijklmnopqrstuvwxyz0123456789-,;.!?:'\"/\\|_@#$%^&*~`+-=<>()[]{} "
     
     def load_fasttext(self) :
         """
         Reads fasttext into memory 
         """
         print("Loading fasttext model...")
+        start = time.time()
         self.word_embedding = ft.load_model(self.fasttext_file)
-        print("done!")
+        print("Done! (t={:.2f}s)".format(time.time()-start))
 
         self.fasttext_loaded = True
 
@@ -53,5 +56,15 @@ class PreprocessCaption :
             word_vector = torch.cat((word_vector, pad))
 
         return word_vector, no_tokens
+
+    def num2char(self, nums) :
+        """
+        Converts a vector in numerical for to character vector (for CUB and Oxford)
+        """
+        char = ""
+        for num in nums :
+            char += self.alphabet[num-1]
+
+        return char
 
         
