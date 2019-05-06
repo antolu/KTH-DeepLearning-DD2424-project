@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
-
+import torch.nn.functional as F
 import numpy as np
 
 
@@ -364,11 +364,15 @@ class Discriminator(nn.Module):
 
 
         # TEXT ENCODER
-        self.bi_GRU = nn.GRU(300, 256, bidirectional=True)
         self.get_betas = nn.Sequential(
             nn.Linear(512, 3),
             nn.Softmax()
         )
+
+        self.text_encoder = RNN_ENCODER(num_words, ninput=300, drop_prob=0.5,
+                                        nhidden=512, nlayers=1, bidirectional=True,
+                                        n_steps=30, rnn_type="GRU")
+        self.avg = TemporalAverage()
 
 
 
@@ -411,15 +415,17 @@ class Discriminator(nn.Module):
         d = self.un_disc(GAP_image3).squeeze()
 
         # Get word embedding
-        word, m, mask = Variable(randn(10, 1, 512)), Variable(randn(1, 512)), Variable(randn(10, 1, 1))
+        batch_size = text.size(0)
+        hidden = self.text_encoder.init_hidden(batch_size)
+        words_embs = self.text_encoder(text, len_text, hidden)
+        avg = self.avg(words_embs).unsqueeze(-1)
 
         # Calculate attentions
-        alphas = (u * m.unsqueeze(0)).sum(-1)
-        alphas_exp = alphas.exp() * mask.squeeze(-1)
-        alphas = (alphas_exp / alphas_exp.sum(0, keepdim=True))
+        u_dot_wi = torch.bmm(words_embs, avg).squeeze(-1)
+        alphas = F.softmax(u_dot_wi)
 
         # Get weights
-        betas = self.get_betas(text)
+        betas = self.get_betas(words_embs)
 
         total = 0
         total_neg = 0
@@ -429,22 +435,22 @@ class Discriminator(nn.Module):
             image = image.mean(-1).mean(-1).unsqueeze(-1)
 
             if j == 0:
-                Wb = self.get_Wb1(u)
+                Wb = self.get_Wb1(words_embs)
             else:
-                Wb = self.get_Wb2(u)
+                Wb = self.get_Wb2(words_embs)
 
             W = Wb[:, :, :-1]  # should have dimensions (batch_size, num_words, 256 or 512 [depending on j])
             b = Wb[:, :, -1].unsqueeze(-1)  # should have dimensions (batch_size, num_words, 1)
 
             if negative:
-                W_neg = W_neg_all[j]
-                b_neg = b_neg_all[j]
+                #TODO: get W_neg and b_neg and betas_neg
                 f_neg = torch.sigmoid(torch.bmm(W_neg, image) + b_neg).squeeze(-1)
                 total_neg += f_neg * betas[:, :, j]  # indexing for betas is wrong total_neg should have dimensions (batch_size, num_words)
             f = torch.sigmoid(torch.bmm(W, image) + b).squeeze(-1)
             total += f * betas[:, :, j]  # total should have dimensions (batch_size, num_words)
 
         if negative:
+            #TODO: get alphas_neg
             alphas_neg = alphas  # need to change this
             total_neg = total_neg.t().pow(alphas_neg).prod(0)  # total_neg should be (batch_size)
         total = total.t().pow(alphas).prod(0)  # total should be (batch_size)
@@ -453,26 +459,6 @@ class Discriminator(nn.Module):
             return d, total, total_neg
         return d, total
 
-    def _encode_txt(self, txt, len_txt):
-        # Check reference [13]
-        hi_f = torch.zeros(txt.size(1), 512, device=txt.device)
-        hi_b = torch.zeros(txt.size(1), 512, device=txt.device)
-        h_f = []
-        h_b = []
-        mask = []
-        for i in range(txt.size(0)):
-            mask_i = (txt.size(0) - 1 - i < len_txt).float().unsqueeze(1)
-            mask.append(mask_i)
-            hi_f = self.txt_encoder_f(txt[i], hi_f)
-            h_f.append(hi_f)
-            hi_b = mask_i * self.txt_encoder_b(txt[-i - 1], hi_b) + (1 - mask_i) * hi_b
-            h_b.append(hi_b)
-        mask = torch.stack(mask[::-1])
-        h_f = torch.stack(h_f) * mask
-        h_b = torch.stack(h_b[::-1])
-        u = (h_f + h_b) / 2
-        m = u.sum(0) / mask.sum(0)
-        return u, m, mask
 
 def initialize_parameters(model):
     if isinstance(model, nn.Conv2d) or isinstance(model, nn.Linear):
