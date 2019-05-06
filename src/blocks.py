@@ -28,7 +28,7 @@ class TextEncoderGenerator(nn.Module):
         super().__init__()
         self.text_encoder = RNN_ENCODER(num_words, ninput=300, drop_prob=0.5,
                                         nhidden=512, nlayers=1, bidirectional=True,
-                                        n_steps=50, rnn_type="GRU")
+                                        n_steps=30, rnn_type="GRU")
         self.avg = TemporalAverage()
         self.mu_cond_aug = nn.Sequential(
             OrderedDict(
@@ -53,7 +53,7 @@ class TextEncoderGenerator(nn.Module):
     def forward(self, text, text_lengths):
         batch_size = text.size(0)
         hidden = self.text_encoder.init_hidden(batch_size)
-        words_embs, _ = self.text_encoder(text, text_lengths, hidden)
+        words_embs = self.text_encoder(text, text_lengths, hidden)
         words_embs = words_embs.detach()
         avg = self.avg(words_embs)
         mu = self.mu_cond_aug(avg)
@@ -145,32 +145,34 @@ class RNN_ENCODER(nn.Module):
                                        bsz, self.nhidden).zero_())
 
     def forward(self, captions, cap_lens, hidden, mask=None):
-        # input: torch.LongTensor of size batch x n_steps
-        # --> emb: batch x n_steps x ninput
-        emb = self.drop(self.encoder(captions))
-        #
-        # Returns: a PackedSequence object
-        cap_lens = cap_lens.data.tolist()
-        emb = pack_padded_sequence(emb, cap_lens, batch_first=True)
+        # # input: torch.LongTensor of size batch x n_steps
+        # # --> emb: batch x n_steps x ninput
+        # emb = self.drop(self.encoder(captions))
+        # #
+        # # Returns: a PackedSequence object
+        # cap_lens = cap_lens.data.tolist()
+        # emb = pack_padded_sequence(emb, cap_lens, batch_first=True)
         # #hidden and memory (num_layers * num_directions, batch, hidden_size):
         # tensor containing the initial hidden state for each element in batch.
         # #output (batch, seq_len, hidden_size * num_directions)
         # #or a PackedSequence object:
         # tensor containing output features (h_t) from the last layer of RNN
-        output, hidden = self.rnn(emb, hidden)
+        output, hidden = self.rnn(captions, hidden)
         # PackedSequence object
         # --> (batch, seq_len, hidden_size * num_directions)
-        output = pad_packed_sequence(output, batch_first=True)[0]
+        # output = pad_packed_sequence(output, batch_first=True)[0]
         # output = self.drop(output)
         # --> batch x hidden_size*num_directions x seq_len
-        words_emb = output.transpose(1, 2)
+        # words_emb = output.transpose(1, 2)
+        words_emb = output
         # --> batch x num_directions*hidden_size
-        if self.rnn_type == 'LSTM':
-            sent_emb = hidden[0].transpose(0, 1).contiguous()
-        else:
-            sent_emb = hidden.transpose(0, 1).contiguous()
-        sent_emb = sent_emb.view(-1, self.nhidden * self.num_directions)
-        return words_emb, sent_emb
+        # if self.rnn_type == 'LSTM':
+        #     sent_emb = hidden[0].transpose(0, 1).contiguous()
+        # else:
+        #     sent_emb = hidden.transpose(0, 1).contiguous()
+        # sent_emb = sent_emb.view(-1, self.nhidden * self.num_directions)
+        # return words_emb, sent_emb
+        return words_emb
 
 
 class ImageEncoderGenerator(nn.Module):
@@ -311,9 +313,9 @@ class Generator(nn.Module):
         # We keep this here for training the conditioning augmentation (https://arxiv.org/pdf/1612.03242.pdf eq 2)
         self.cond_aug_params = self.a.mu_cond_aug, self.a.sigma_cond_aug
 
-    def forward(self, xtext, ximage):
+    def forward(self, ximage, xtext, xtext_lengths):
         # x includes both the text and the image
-        a = self.a(xtext)
+        a = self.a(xtext, xtext_lengths)
         b = self.b(ximage)
         ab = self.ab(a, b)
         c = b + ab
