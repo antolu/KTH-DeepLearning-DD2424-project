@@ -59,7 +59,6 @@ class TextEncoderGenerator(nn.Module):
         batch_size = text.size(0)
         hidden = self.text_encoder.init_hidden(batch_size)
         words_embs = self.text_encoder(text, text_lengths, hidden)
-        words_embs = words_embs.detach()
         avg = self.avg(words_embs)
         mu = self.mu_cond_aug(avg)
         sigma = self.mu_cond_aug(avg)
