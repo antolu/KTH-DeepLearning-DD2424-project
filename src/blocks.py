@@ -1,8 +1,13 @@
 # TAGAN implementation
 from collections import OrderedDict
 
+from torch import randn
+from torch.autograd import Variable
+
 import torch
 import torch.nn as nn
+
+import numpy as np
 
 
 class ConditioningAugmentation(nn.Module):
@@ -223,15 +228,8 @@ class Generator(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self):
+    def __init__(self, num_words):
         super().__init__()
-        self.ie = ImageEncoderDiscriminator()
-        self.ud = UnconditionalDiscriminator()
-        self.te = TextEncoderDiscriminator()
-        self.tad = TextAdaptiveDiscriminator()
-        self.d = ConditionalDiscriminator()
-        super(Discriminator, self).__init__()
-
 
         # IMAGE ENCODER
         self.conv3 = nn.Sequential(
@@ -266,7 +264,7 @@ class Discriminator(nn.Module):
 
 
         # TEXT ENCODER
-        self.bi_GRU = nn.GRU(300, 512, bidirectional=True)
+        self.bi_GRU = nn.GRU(300, 256, bidirectional=True)
         self.get_betas = nn.Sequential(
             nn.Linear(512, 3),
             nn.Softmax()
@@ -294,11 +292,14 @@ class Discriminator(nn.Module):
             nn.LeakyReLU(0.2, inplace=True)
         )
 
-        # CONDITIONAL DISCRIMINATOR
+        # CONDITIONAL DISCRIMINATOR contained in forward pass
 
+        self.get_Wb1 = nn.Linear(512, 257)
+        self.get_Wb2 = nn.Linear(512, 513)
 
-    def forward(self, image, text):
-        # x is the image
+        self.apply(initialize_parameters)
+
+    def forward(self, image, text, len_text, negative=False):
 
         image1 = self.conv3(image)
         image2 = self.conv4(image1)
@@ -307,32 +308,71 @@ class Discriminator(nn.Module):
         GAP_image2 = self.GAP2(image2)
         GAP_image3 = self.GAP3(image3)
         GAP_images = [GAP_image1, GAP_image2, GAP_image3]
-        d = self.un_disc(GAP_image3)
+        d = self.un_disc(GAP_image3).squeeze()
 
-        # Get word vectors (w), temporal avg(u) and multiply to get prod
+        # Get word embedding
+        word, m, mask = Variable(randn(10, 1, 512)), Variable(randn(1, 512)), Variable(randn(10, 1, 1))
 
         # Calculate attentions
-        attn = nn.Softmax(prod)
+        alphas = (u * m.unsqueeze(0)).sum(-1)
+        alphas_exp = alphas.exp() * mask.squeeze(-1)
+        alphas = (alphas_exp / alphas_exp.sum(0, keepdim=True))
 
+        # Get weights
+        betas = self.get_betas(text)
 
-        beta = self.get_betas(w)
-
-        sum = 0
+        total = 0
+        total_neg = 0
 
         for j in range(3):
             image = GAP_images[j]
-            W =  # How to genrerate W?
-            b = # How to generate b?
+            image = image.mean(-1).mean(-1).unsqueeze(-1)
 
-            sum += nn.Sigmoid(torch.mm(W, image) + b) * beta[j]
+            if j == 0:
+                Wb = self.get_Wb1(u)
+            else:
+                Wb = self.get_Wb2(u)
 
+            W = Wb[:, :, :-1]  # should have dimensions (batch_size, num_words, 256 or 512 [depending on j])
+            b = Wb[:, :, -1].unsqueeze(-1)  # should have dimensions (batch_size, num_words, 1)
 
-        f = f.
+            if negative:
+                W_neg = W_neg_all[j]
+                b_neg = b_neg_all[j]
+                f_neg = torch.sigmoid(torch.bmm(W_neg, image) + b_neg).squeeze(-1)
+                total_neg += f_neg * betas[:, :, j]  # indexing for betas is wrong total_neg should have dimensions (batch_size, num_words)
+            f = torch.sigmoid(torch.bmm(W, image) + b).squeeze(-1)
+            total += f * betas[:, :, j]  # total should have dimensions (batch_size, num_words)
 
+        if negative:
+            alphas_neg = alphas  # need to change this
+            total_neg = total_neg.t().pow(alphas_neg).prod(0)  # total_neg should be (batch_size)
+        total = total.t().pow(alphas).prod(0)  # total should be (batch_size)
 
+        if negative:
+            return d, total, total_neg
+        return d, total
 
-        return d
-
+    def _encode_txt(self, txt, len_txt):
+        # Check reference [13]
+        hi_f = torch.zeros(txt.size(1), 512, device=txt.device)
+        hi_b = torch.zeros(txt.size(1), 512, device=txt.device)
+        h_f = []
+        h_b = []
+        mask = []
+        for i in range(txt.size(0)):
+            mask_i = (txt.size(0) - 1 - i < len_txt).float().unsqueeze(1)
+            mask.append(mask_i)
+            hi_f = self.txt_encoder_f(txt[i], hi_f)
+            h_f.append(hi_f)
+            hi_b = mask_i * self.txt_encoder_b(txt[-i - 1], hi_b) + (1 - mask_i) * hi_b
+            h_b.append(hi_b)
+        mask = torch.stack(mask[::-1])
+        h_f = torch.stack(h_f) * mask
+        h_b = torch.stack(h_b[::-1])
+        u = (h_f + h_b) / 2
+        m = u.sum(0) / mask.sum(0)
+        return u, m, mask
 
 def initialize_parameters(model):
     if isinstance(model, nn.Conv2d) or isinstance(model, nn.Linear):
