@@ -293,8 +293,8 @@ class Discriminator(nn.Module):
             return d
 
         # Get word embedding
-        words_embs = encode_text(text, len_text, self.gru_f, self.gru_b)
-        avg = self.avg(words_embs).unsqueeze(-1)
+        words_embs, mask = encode_text(text, len_text, self.gru_f, self.gru_b)
+        avg = self.avg(words_embs, mask).unsqueeze(-1)
 
         # Calculate attentions
         u_dot_wi = torch.bmm(words_embs, avg).squeeze(-1)
