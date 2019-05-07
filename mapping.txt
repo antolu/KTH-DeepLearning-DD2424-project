@@ -1,4 +1,27 @@
 # Our implementation || Theirs
+# Maps our network to the one of the authors, to be able to
+# Load their model weights into our network as a pretrained network
+
+
+# Text encoder
+# Bidirectional GRU
+a.text_encoder.rnn.weight_ih_l0             txt_encoder_f.weight_ih
+a.text_encoder.rnn.weight_hh_l0             txt_encoder_f.weight_hh
+a.text_encoder.rnn.bias_ih_l0               txt_encoder_f.bias_ih
+a.text_encoder.rnn.bias_hh_l0               txt_encoder_f.bias_hh
+a.text_encoder.rnn.weight_ih_l0_reverse     txt_encoder_b.weight_ih
+a.text_encoder.rnn.weight_hh_l0_reverse     txt_encoder_b.weight_hh
+a.text_encoder.rnn.bias_ih_l0_reverse       txt_encoder_b.bias_ih
+a.text_encoder.rnn.bias_hh_l0_reverse       txt_encoder_b.bias_hh
+
+
+# Conditioning augmentation
+a.mu_cond_aug.lin.weight                    mu.0.weight
+a.mu_cond_aug.lin.bias                      mu.0.bias
+a.sigma_cond_aug.lin.weight                 log_sigma.0.weight
+a.sigma_cond_aug.lin.bias                   log_sigma.0.bias
+
+
 
 # Image encoder
 b.main.conv1.weight                 encoder.0.weight
@@ -25,6 +48,81 @@ b.main.bn4.running_mean             encoder.9.running_mean
 b.main.bn4.running_var              encoder.9.running_var
 b.main.bn4.num_batches_tracked      None
 
+
+# Residual blocks
+ab.main.conv1.weight                        residual_blocks.0.weight
+ab.main.conv1.bias                          None
+ab.main.bn1.weight                          residual_blocks.1.weight
+ab.main.bn1.bias                            residual_blocks.1.bias
+ab.main.bn1.running_mean                    residual_blocks.1.running_mean
+ab.main.bn1.running_var                     residual_blocks.1.running_var
+ab.main.bn1.num_batches_tracked             None
+
+ab.main.res1.main.conv1.weight              residual_blocks.3.encoder.0.weight
+ab.main.res1.main.conv1.bias                None
+ab.main.res1.main.bn1.weight                residual_blocks.3.encoder.1.weight
+ab.main.res1.main.bn1.bias                  residual_blocks.3.encoder.1.bias
+ab.main.res1.main.bn1.running_mean          residual_blocks.3.encoder.1.running_mean
+ab.main.res1.main.bn1.running_var           residual_blocks.3.encoder.1.running_var
+ab.main.res1.main.bn1.num_batches_tracked   None
+
+ab.main.res1.main.conv2.weight              residual_blocks.3.encoder.3.weight
+ab.main.res1.main.conv2.bias                None
+ab.main.res1.main.bn2.weight                residual_blocks.3.encoder.4.weight
+ab.main.res1.main.bn2.bias                  residual_blocks.3.encoder.4.bias
+ab.main.res1.main.bn2.running_mean          residual_blocks.3.encoder.4.running_mean
+ab.main.res1.main.bn2.running_var           residual_blocks.3.encoder.4.running_var
+ab.main.res1.main.bn2.num_batches_tracked   None
+
+ab.main.res2.main.conv1.weight              residual_blocks.4.encoder.0.weight
+ab.main.res2.main.conv1.bias                None
+ab.main.res2.main.bn1.weight                residual_blocks.4.encoder.1.weight
+ab.main.res2.main.bn1.bias                  residual_blocks.4.encoder.1.bias
+ab.main.res2.main.bn1.running_mean          residual_blocks.4.encoder.1.running_mean
+ab.main.res2.main.bn1.running_var           residual_blocks.4.encoder.1.running_var
+ab.main.res2.main.bn1.num_batches_tracked   None
+
+ab.main.res2.main.conv2.weight              residual_blocks.4.encoder.3.weight
+ab.main.res2.main.conv2.bias                None
+ab.main.res2.main.bn2.weight                residual_blocks.4.encoder.4.weight
+ab.main.res2.main.bn2.bias                  residual_blocks.4.encoder.4.bias
+ab.main.res2.main.bn2.running_mean          residual_blocks.4.encoder.4.running_mean
+ab.main.res2.main.bn2.running_var           residual_blocks.4.encoder.4.running_var
+ab.main.res2.main.bn2.num_batches_tracked   None
+
+ab.main.res3.main.conv1.weight              residual_blocks.5.encoder.0.weight
+ab.main.res3.main.conv1.bias                None
+ab.main.res3.main.bn1.weight                residual_blocks.5.encoder.1.weight
+ab.main.res3.main.bn1.bias                  residual_blocks.5.encoder.1.bias
+ab.main.res3.main.bn1.running_mean          residual_blocks.5.encoder.1.running_mean
+ab.main.res3.main.bn1.running_var           residual_blocks.5.encoder.1.running_var
+ab.main.res3.main.bn1.num_batches_tracked   None
+
+ab.main.res3.main.conv2.weight              residual_blocks.5.encoder.3.weight
+ab.main.res3.main.conv2.bias                None
+ab.main.res3.main.bn2.weight                residual_blocks.5.encoder.4.weight
+ab.main.res3.main.bn2.bias                  residual_blocks.5.encoder.4.bias
+ab.main.res3.main.bn2.running_mean          residual_blocks.5.encoder.4.running_mean
+ab.main.res3.main.bn2.running_var           residual_blocks.5.encoder.4.running_var	
+ab.main.res3.main.bn2.num_batches_tracked   None
+
+ab.main.res4.main.conv1.weight              residual_blocks.6.encoder.0.weight
+ab.main.res4.main.conv1.bias                None
+ab.main.res4.main.bn1.weight                residual_blocks.6.encoder.1.weight
+ab.main.res4.main.bn1.bias                  residual_blocks.6.encoder.1.bias
+ab.main.res4.main.bn1.running_mean          residual_blocks.6.encoder.1.running_mean
+ab.main.res4.main.bn1.running_var           residual_blocks.6.encoder.1.running_var
+ab.main.res4.main.bn1.num_batches_tracked   None
+
+ab.main.res4.main.conv2.weight              residual_blocks.6.encoder.3.weight
+ab.main.res4.main.conv2.bias                None
+ab.main.res4.main.bn2.weight                residual_blocks.6.encoder.4.weight
+ab.main.res4.main.bn2.bias                  residual_blocks.6.encoder.4.bias
+ab.main.res4.main.bn2.running_mean          residual_blocks.6.encoder.4.running_mean
+ab.main.res4.main.bn2.running_var           residual_blocks.6.encoder.4.running_var
+ab.main.res4.main.bn2.num_batches_tracked   None
+
+
 # Image decoder 
 d.main.conv1.weight                 decoder.1.weight
 d.main.conv1.bias                   None
@@ -49,93 +147,3 @@ d.main.bn3.running_var              decoder.10.running_var
 d.main.bn3.num_batches_tracked      None
 d.main.conv4.weight                 decoder.12.weight
 d.main.conv4.bias                   decoder.12.bias
-
-# Text encoder
-# Bidirectional GRU
-a.text_encoder.rnn.weight_ih_l0		        txt_encoder_f.weight_ih
-a.text_encoder.rnn.weight_hh_l0		        txt_encoder_f.weight_hh
-a.text_encoder.rnn.bias_ih_l0		        txt_encoder_f.bias_ih
-a.text_encoder.rnn.bias_hh_l0               txt_encoder_f.bias_hh
-a.text_encoder.rnn.weight_ih_l0_reverse		txt_encoder_b.weight_ih
-a.text_encoder.rnn.weight_hh_l0_reverse		txt_encoder_b.weight_hh
-a.text_encoder.rnn.bias_ih_l0_reverse		txt_encoder_b.bias_ih
-a.text_encoder.rnn.bias_hh_l0_reverse		txt_encoder_b.bias_hh
-
-# Conditioning augmentation
-a.mu_cond_aug.lin.weight                    mu.0.weight
-a.mu_cond_aug.lin.bias                      mu.0.bias
-a.sigma_cond_aug.lin.weight	                log_sigma.0.weight
-a.sigma_cond_aug.lin.bias                   log_sigma.0.bias
-
-# Residual blocks
-ab.main.conv1.weight                        residual_blocks.0.weight
-ab.main.conv1.bias                          None
-ab.main.bn1.weight                          residual_blocks.1.weight
-ab.main.bn1.bias                            residual_blocks.1.bias
-ab.main.bn1.running_mean                    residual_blocks.1.running_mean
-ab.main.bn1.running_var                     residual_blocks.1.running_var
-ab.main.bn1.num_batches_tracked             None
-
-ab.main.res1.main.conv1.weight              residual_blocks.3.encoder.0.weight
-ab.main.res1.main.conv1.bias                None
-ab.main.res1.main.bn1.weight                residual_blocks.3.encoder.1.weight
-ab.main.res1.main.bn1.bias                  residual_blocks.3.encoder.1.bias
-ab.main.res1.main.bn1.running_mean          residual_blocks.3.encoder.1.running_mean
-ab.main.res1.main.bn1.running_var           residual_blocks.3.encoder.1.running_var
-ab.main.res1.main.bn1.num_batches_tracked   None
-
-ab.main.res1.main.conv2.weight				residual_blocks.3.encoder.3.weight
-ab.main.res1.main.conv2.bias                None
-ab.main.res1.main.bn2.weight                residual_blocks.3.encoder.4.weight
-ab.main.res1.main.bn2.bias                  residual_blocks.3.encoder.4.bias
-ab.main.res1.main.bn2.running_mean          residual_blocks.3.encoder.4.running_mean
-ab.main.res1.main.bn2.running_var           residual_blocks.3.encoder.4.running_var
-ab.main.res1.main.bn2.num_batches_tracked	None
-
-ab.main.res2.main.conv1.weight              residual_blocks.4.encoder.0.weight
-ab.main.res2.main.conv1.bias                None
-ab.main.res2.main.bn1.weight                residual_blocks.4.encoder.1.weight
-ab.main.res2.main.bn1.bias					residual_blocks.4.encoder.1.bias
-ab.main.res2.main.bn1.running_mean          residual_blocks.4.encoder.1.running_mean
-ab.main.res2.main.bn1.running_var           residual_blocks.4.encoder.1.running_var
-ab.main.res2.main.bn1.num_batches_tracked	None
-
-ab.main.res2.main.conv2.weight              residual_blocks.4.encoder.3.weight
-ab.main.res2.main.conv2.bias                None
-ab.main.res2.main.bn2.weight                residual_blocks.4.encoder.4.weight
-ab.main.res2.main.bn2.bias                  residual_blocks.4.encoder.4.bias
-ab.main.res2.main.bn2.running_mean          residual_blocks.4.encoder.4.running_mean
-ab.main.res2.main.bn2.running_var           residual_blocks.4.encoder.4.running_var
-ab.main.res2.main.bn2.num_batches_tracked   None
-
-ab.main.res3.main.conv1.weight              residual_blocks.5.encoder.0.weight
-ab.main.res3.main.conv1.bias                None
-ab.main.res3.main.bn1.weight                residual_blocks.5.encoder.1.weight
-ab.main.res3.main.bn1.bias                  residual_blocks.5.encoder.1.bias
-ab.main.res3.main.bn1.running_mean          residual_blocks.5.encoder.1.running_mean
-ab.main.res3.main.bn1.running_var           residual_blocks.5.encoder.1.running_var
-ab.main.res3.main.bn1.num_batches_tracked   None
-
-ab.main.res3.main.conv2.weight				residual_blocks.5.encoder.3.weight
-ab.main.res3.main.conv2.bias                None
-ab.main.res3.main.bn2.weight                residual_blocks.5.encoder.4.weight
-ab.main.res3.main.bn2.bias                  residual_blocks.5.encoder.4.bias
-ab.main.res3.main.bn2.running_mean          residual_blocks.5.encoder.4.running_mean
-ab.main.res3.main.bn2.running_var           residual_blocks.5.encoder.4.running_var	
-ab.main.res3.main.bn2.num_batches_tracked   None
-
-ab.main.res4.main.conv1.weight              residual_blocks.6.encoder.0.weight
-ab.main.res4.main.conv1.bias                None
-ab.main.res4.main.bn1.weight                residual_blocks.6.encoder.1.weight
-ab.main.res4.main.bn1.bias                  residual_blocks.6.encoder.1.bias
-ab.main.res4.main.bn1.running_mean          residual_blocks.6.encoder.1.running_mean
-ab.main.res4.main.bn1.running_var           residual_blocks.6.encoder.1.running_var
-ab.main.res4.main.bn1.num_batches_tracked	None
-
-ab.main.res4.main.conv2.weight              residual_blocks.6.encoder.3.weight
-ab.main.res4.main.conv2.bias                None
-ab.main.res4.main.bn2.weight                residual_blocks.6.encoder.4.weight
-ab.main.res4.main.bn2.bias                  residual_blocks.6.encoder.4.bias
-ab.main.res4.main.bn2.running_mean          residual_blocks.6.encoder.4.running_mean
-ab.main.res4.main.bn2.running_var           residual_blocks.6.encoder.4.running_var
-ab.main.res4.main.bn2.num_batches_tracked   None
