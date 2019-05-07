@@ -21,6 +21,6 @@ def loss_discriminator(image, text, negative_text, text_length, D, G, lambda_1):
     tt2 = torch.log(D(image, text, text_length, negative=False))
     tt3 = torch.log(1.0 - D(image, negative_text, text_length, negative=True))
     t1 = torch.mean(tt1 + lambda_1 * (tt2 + tt3))
-    t2 = torch.mean(torch.log(1.0 - D(G(image, negative_text, text_length))))
+    t2 = torch.mean(torch.log(1.0 - D(G(image, negative_text, text_length)[0])))
     loss = t1 + t2
     return loss
