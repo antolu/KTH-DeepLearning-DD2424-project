@@ -200,7 +200,7 @@ class Generator(nn.Module):
         ab = self.ab(a, b)
         # c = b + ab
         c = ab
-        d = self.d(c)
+        d = self.d(b + c)
         return d, mu, sigma
 
 
