@@ -72,9 +72,10 @@ while True :
     else :
         caption_vec, no_words = pc.string_to_vector(cap, args.max_no_words)
 
-    generated_data = generator(sample["tensor"], caption_vec, torch.Tensor([no_words]))
+    generated_orig = generator(sample["tensor"], sample["caption_vector"], torch.Tensor([sample["no_words"]]))
+    generated_mod = generator(sample["tensor"], caption_vec, torch.Tensor([no_words]))
 
-    disp_sidebyside([sample["img"], sample["tensor"].squeeze(), generated_data[0].squeeze()], caption=cap)
+    disp_sidebyside([sample["img"], sample["tensor"].squeeze(), generated_orig[0].squeeze(), generated_mod[0].squeeze()], caption=cap)
 
     prompt = input("Do you want to keep generating more images? (y/n) ")
     if prompt != "y" :
