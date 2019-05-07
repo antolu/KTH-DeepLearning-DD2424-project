@@ -39,7 +39,7 @@ class ParseMapping :
         for layer in our_model.keys() :
             if layer not in our_to_their :
                 print("Layer {} not in our model".format(layer))
-                mapped_parameters[layer] = our_model[layer]
+                # mapped_parameters[layer] = our_model[layer]
                 n += 1
                 continue
 
