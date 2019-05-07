@@ -1,9 +1,6 @@
 # TAGAN implementation
 from collections import OrderedDict
 
-from torch import randn
-from torch.autograd import Variable
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -24,9 +21,6 @@ class ConditioningAugmentation(nn.Module):
 class TemporalAverage(nn.Module):
     def forward(self, x):
         return torch.mean(x, 1)
-
-class TextEncoderDiscriminator(nn.Module):
-    pass
 
 
 class TextEncoderGenerator(nn.Module):
@@ -60,8 +54,8 @@ class TextEncoderGenerator(nn.Module):
         avg = self.avg(words_embs)
         mu = self.mu_cond_aug(avg)
         sigma = self.sigma_cond_aug(avg)
-        final = self.cond_aug(mu, sigma)
-        return final, mu, sigma
+        final = self.cond_aug(mu, torch.exp(sigma))
+        return final, mu, torch.exp(sigma)
 
 
 class ImageEncoderDiscriminator(nn.Module):
