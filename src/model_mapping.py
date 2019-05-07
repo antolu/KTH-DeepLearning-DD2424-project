@@ -1,6 +1,6 @@
 import torch
 from collections import OrderedDict
-from src.blocks import *
+# from src.blocks import *
 
 class ParseMapping :
     def __init__(self, mapping_file, their_model_file=None, our_model_file=None) :
@@ -63,10 +63,10 @@ class ParseMapping :
         return self.mapped_parameters
 
 # Usage example 
-# pm = ParseMapping("mapping.txt", their_model_file="models/flowers_G.pth", our_model_file="our_model.pth")
+pm = ParseMapping("mapping.txt", their_model_file="models/flowers_G.pth", our_model_file="our_model.pth")
 
-# pm.parse()
-# pm.write_mapping()
+pm.parse()
+pm.write_mapping()
 
 # mapping = pm.mapped_parameters
 
