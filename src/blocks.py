@@ -59,7 +59,7 @@ class TextEncoderGenerator(nn.Module):
         words_embs = encode_text(text, text_lengths, self.gru_f, self.gru_b)
         avg = self.avg(words_embs)
         mu = self.mu_cond_aug(avg)
-        sigma = self.mu_cond_aug(avg)
+        sigma = self.sigma_cond_aug(avg)
         final = self.cond_aug(mu, sigma)
         return final, mu, sigma
 
@@ -359,12 +359,12 @@ class Discriminator(nn.Module):
 
         if negative:
             alphas_neg = alphas[idx_neg, :]  # need to change this
-            total_neg = total_neg.t().pow(alphas_neg.t()).prod(0)  # total_neg should be (batch_size)
-        total = total.t().pow(alphas.t()).prod(0)  # total should be (batch_size)
+            total_neg = (alphas_neg*torch.log(total_neg)).sum(1)  # total_neg should be (batch_size)
+        total = (alphas*torch.log(total)).sum(1)  # total should be (batch_size)
 
         if negative:
-            return total_neg
-        return total
+            return torch.exp(total_neg)
+        return torch.exp(total)
 
 
 def initialize_parameters(model):
