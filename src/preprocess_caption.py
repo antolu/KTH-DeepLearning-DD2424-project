@@ -55,7 +55,7 @@ class PreprocessCaption :
             pad = torch.zeros(max_no_words - no_tokens, word_vector.shape[1])
             word_vector = torch.cat((word_vector, pad))
 
-        return word_vector, no_tokens
+        return word_vector.unsqueeze(0), no_tokens
 
     def num2char(self, nums) :
         """
