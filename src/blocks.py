@@ -1,10 +1,15 @@
 # TAGAN implementation
 from collections import OrderedDict
 
+from torch import randn
+from torch.autograd import Variable
+
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
+import torch.nn.functional as F
+import numpy as np
 
 
 class ConditioningAugmentation(nn.Module):
@@ -323,36 +328,29 @@ class Generator(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self):
+    def __init__(self, num_words):
         super().__init__()
-        self.ie = ImageEncoderDiscriminator()
-        self.ud = UnconditionalDiscriminator()
-        self.te = TextEncoderDiscriminator()
-        self.tad = TextAdaptiveDiscriminator()
-        self.d = ConditionalDiscriminator()
-        super(Discriminator, self).__init__()
-
 
         # IMAGE ENCODER
         self.conv3 = nn.Sequential(
-            nn.Conv2d(3, 64, 4, padding=2, bias=False),
+            nn.Conv2d(3, 64, 4, 2, padding=1, bias=False),
             nn.LeakyReLU(0.2, inplace=True), # I'm including this 'inplace' part since the example I am following has used it
-            nn.Conv2d(64, 128, 4, padding=2, bias=False),
+            nn.Conv2d(64, 128, 4, 2, padding=1, bias=False),
             nn.BatchNorm2d(128),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(128, 256, 4, padding=2, bias=False),
+            nn.Conv2d(128, 256, 4, 2, padding=1, bias=False),
             nn.BatchNorm2d(256),
             nn.LeakyReLU(0.2, inplace=True)
         )
 
         self.conv4 = nn.Sequential(
-            nn.Conv2d(256, 512, 4, padding=2, bias=False),
+            nn.Conv2d(256, 512, 4, 2, padding=1, bias=False),
             nn.BatchNorm2d(512),
             nn.LeakyReLU(0.2, inplace=True)
         )
 
         self.conv5 = nn.Sequential(
-            nn.Conv2d(512, 512, 4, padding=2, bias=False),
+            nn.Conv2d(512, 512, 4, 2, padding=1, bias=False),
             nn.BatchNorm2d(512),
             nn.LeakyReLU(0.2, inplace=True)
         )
@@ -366,11 +364,15 @@ class Discriminator(nn.Module):
 
 
         # TEXT ENCODER
-        self.bi_GRU = nn.GRU(300, 512, bidirectional=True)
         self.get_betas = nn.Sequential(
             nn.Linear(512, 3),
             nn.Softmax()
         )
+
+        self.text_encoder = RNN_ENCODER(num_words, ninput=300, drop_prob=0.5,
+                                        nhidden=512, nlayers=1, bidirectional=True,
+                                        n_steps=30, rnn_type="GRU")
+        self.avg = TemporalAverage()
 
 
 
@@ -394,11 +396,14 @@ class Discriminator(nn.Module):
             nn.LeakyReLU(0.2, inplace=True)
         )
 
-        # CONDITIONAL DISCRIMINATOR
+        # CONDITIONAL DISCRIMINATOR contained in forward pass
 
+        self.get_Wb1 = nn.Linear(512, 257)
+        self.get_Wb2 = nn.Linear(512, 513)
 
-    def forward(self, image, text):
-        # x is the image
+        self.apply(initialize_parameters)
+
+    def forward(self, image, text, len_text, negative=False):
 
         image1 = self.conv3(image)
         image2 = self.conv4(image1)
@@ -406,10 +411,57 @@ class Discriminator(nn.Module):
         GAP_image1 = self.GAP1(image1)
         GAP_image2 = self.GAP2(image2)
         GAP_image3 = self.GAP3(image3)
-        #GAP_images = [GAP_image1, GAP_image2, GAP_image3]
-        d = self.un_disc(GAP_image3)
+        GAP_images = [GAP_image1, GAP_image2, GAP_image3]
+        d = self.un_disc(GAP_image3).squeeze()
 
-        return d
+        # Get word embedding
+        batch_size = text.size(0)
+        hidden = self.text_encoder.init_hidden(batch_size)
+        words_embs = self.text_encoder(text, len_text, hidden)
+        avg = self.avg(words_embs).unsqueeze(-1)
+
+        # Calculate attentions
+        u_dot_wi = torch.bmm(words_embs, avg).squeeze(-1)
+        alphas = F.softmax(u_dot_wi)
+
+        # Get weights
+        betas = self.get_betas(words_embs)
+
+        total = 0
+        total_neg = 0
+
+        idx = np.arange(0, image.size(0))
+        idx_neg = torch.tensor(np.roll(idx, 1))
+
+        for j in range(3):
+            image = GAP_images[j]
+            image = image.mean(-1).mean(-1).unsqueeze(-1)
+
+            if j == 0:
+                Wb = self.get_Wb1(words_embs)
+            else:
+                Wb = self.get_Wb2(words_embs)
+
+            W = Wb[:, :, :-1]
+            b = Wb[:, :, -1].unsqueeze(-1)
+
+            if negative:
+                W_neg = W[idx_neg]
+                b_neg = b[idx_neg]
+                betas_neg = betas.permute(2,0,1)
+                f_neg = torch.sigmoid(torch.bmm(W_neg, image) + b_neg).squeeze(-1)
+                total_neg += f_neg * betas_neg[j][idx_neg]
+            f = torch.sigmoid(torch.bmm(W, image) + b).squeeze(-1)
+            total += f * betas[:, :, j]
+
+        if negative:
+            alphas_neg = alphas[idx_neg, :]  # need to change this
+            total_neg = total_neg.t().pow(alphas_neg.t()).prod(0)  # total_neg should be (batch_size)
+        total = total.t().pow(alphas.t()).prod(0)  # total should be (batch_size)
+
+        if negative:
+            return d, total, total_neg
+        return d, total
 
 
 def initialize_parameters(model):
