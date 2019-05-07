@@ -275,9 +275,8 @@ class Discriminator(nn.Module):
             nn.Softmax()
         )
 
-        self.text_encoder = RNN_ENCODER(num_words, ninput=300, drop_prob=0.5,
-                                        nhidden=1024, nlayers=1, bidirectional=True,
-                                        rnn_type="GRU")
+        self.gru_f = nn.GRUCell(input_size=300, hidden_size=512)
+        self.gru_b = nn.GRUCell(input_size=300, hidden_size=512)
         self.avg = TemporalAverage()
 
 
@@ -321,9 +320,7 @@ class Discriminator(nn.Module):
         d = self.un_disc(GAP_image3).squeeze()
 
         # Get word embedding
-        batch_size = text.size(0)
-        hidden = self.text_encoder.init_hidden(batch_size)
-        words_embs = self.text_encoder(text, len_text, hidden)
+        words_embs = encode_text(text, len_text, self.gru_f, self.gru_b)
         avg = self.avg(words_embs).unsqueeze(-1)
 
         # Calculate attentions
