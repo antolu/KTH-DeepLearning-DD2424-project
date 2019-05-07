@@ -448,8 +448,9 @@ class Discriminator(nn.Module):
             if negative:
                 W_neg = W[idx_neg]
                 b_neg = b[idx_neg]
+                betas_neg = betas.permute(2,0,1)
                 f_neg = torch.sigmoid(torch.bmm(W_neg, image) + b_neg).squeeze(-1)
-                total_neg += f_neg * betas[idx_neg, j]
+                total_neg += f_neg * betas_neg[j][idx_neg]
             f = torch.sigmoid(torch.bmm(W, image) + b).squeeze(-1)
             total += f * betas[:, :, j]
 
