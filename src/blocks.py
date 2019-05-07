@@ -6,8 +6,6 @@ from torch.autograd import Variable
 
 import torch
 import torch.nn as nn
-from torch.autograd import Variable
-from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 import torch.nn.functional as F
 import numpy as np
 
@@ -17,7 +15,10 @@ class ConditioningAugmentation(nn.Module):
         super().__init__()
 
     def forward(self, mu, sigma):
-        return torch.randn(mu.shape) * sigma + mu
+        res = torch.zeros_like(mu)
+        for i in range(mu.size(0)):
+            res[i] = torch.randn(mu[i].shape) * sigma[i] + mu[i]
+        return res
 
 
 class TemporalAverage(nn.Module):
@@ -60,7 +61,7 @@ class TextEncoderGenerator(nn.Module):
         mu = self.mu_cond_aug(avg)
         sigma = self.mu_cond_aug(avg)
         final = self.cond_aug(mu, sigma)
-        return final
+        return final, mu, sigma
 
 
 class ImageEncoderDiscriminator(nn.Module):
@@ -220,17 +221,14 @@ class Generator(nn.Module):
         self.d = Decoder()
         self.apply(initialize_parameters)
 
-        # We keep this here for training the conditioning augmentation (https://arxiv.org/pdf/1612.03242.pdf eq 2)
-        self.cond_aug_params = self.a.mu_cond_aug, self.a.sigma_cond_aug
-
     def forward(self, ximage, xtext, xtext_lengths):
         # x includes both the text and the image
-        a = self.a(xtext, xtext_lengths)
+        a, mu, sigma = self.a(xtext, xtext_lengths)
         b = self.b(ximage)
         ab = self.ab(a, b)
         c = b + ab
         d = self.d(c)
-        return d
+        return d, mu, sigma
 
 
 class Discriminator(nn.Module):
@@ -308,7 +306,7 @@ class Discriminator(nn.Module):
 
         self.apply(initialize_parameters)
 
-    def forward(self, image, text, len_text, negative=False):
+    def forward(self, image, text=None, len_text=None, negative=False):
 
         image1 = self.conv3(image)
         image2 = self.conv4(image1)
@@ -318,6 +316,8 @@ class Discriminator(nn.Module):
         GAP_image3 = self.GAP3(image3)
         GAP_images = [GAP_image1, GAP_image2, GAP_image3]
         d = self.un_disc(GAP_image3).squeeze()
+        if (text is None):
+            return d
 
         # Get word embedding
         words_embs = encode_text(text, len_text, self.gru_f, self.gru_b)
@@ -363,8 +363,8 @@ class Discriminator(nn.Module):
         total = total.t().pow(alphas.t()).prod(0)  # total should be (batch_size)
 
         if negative:
-            return d, total, total_neg
-        return d, total
+            return total_neg
+        return total
 
 
 def initialize_parameters(model):
