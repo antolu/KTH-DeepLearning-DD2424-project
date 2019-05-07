@@ -118,6 +118,7 @@ class ConcatABResidualBlocks(nn.Module):
                 [
                     ("conv1", nn.Conv2d(640, 512, 3, 1, 1)),
                     ("bn1", nn.BatchNorm2d(512)),
+                    ("relu1", nn.ReLU()),
                     ("res1", ResidualBlock(512, 512)),
                     ("res2", ResidualBlock(512, 512)),
                     ("res3", ResidualBlock(512, 512)),
