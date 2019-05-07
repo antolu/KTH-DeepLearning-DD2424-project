@@ -27,8 +27,8 @@ class TextEncoderGenerator(nn.Module):
     def __init__(self, num_words):
         super().__init__()
         self.text_encoder = RNN_ENCODER(num_words, ninput=300, drop_prob=0.5,
-                                        nhidden=512, nlayers=1, bidirectional=True,
-                                        n_steps=30, rnn_type="GRU")
+                                        nhidden=1024, nlayers=1, bidirectional=True,
+                                        rnn_type="GRU")
         self.avg = TemporalAverage()
         self.mu_cond_aug = nn.Sequential(
             OrderedDict(
@@ -86,10 +86,9 @@ class ImageEncoderDiscriminator(nn.Module):
 # ############## Text2Image Encoder-Decoder #######
 class RNN_ENCODER(nn.Module):
     def __init__(self, ntoken, ninput=300, drop_prob=0.5,
-                 nhidden=512, nlayers=1, bidirectional=True,
-                 n_steps=50, rnn_type="GRU"):
+                 nhidden=1024, nlayers=1, bidirectional=True,
+                 rnn_type="GRU"):
         super(RNN_ENCODER, self).__init__()
-        self.n_steps = n_steps
         self.ntoken = ntoken  # size of the dictionary
         self.ninput = ninput  # size of each embedding vector
         self.drop_prob = drop_prob  # probability of an element to be zeroed
@@ -107,7 +106,7 @@ class RNN_ENCODER(nn.Module):
         self.init_weights()
 
     def define_module(self):
-        self.encoder = nn.Embedding(self.ntoken, self.ninput)
+        # self.encoder = nn.Embedding(self.ntoken, self.ninput)
         self.drop = nn.Dropout(self.drop_prob)
         if self.rnn_type == 'LSTM':
             # dropout: If non-zero, introduces a dropout layer on
@@ -125,12 +124,13 @@ class RNN_ENCODER(nn.Module):
             raise NotImplementedError
 
     def init_weights(self):
-        initrange = 0.1
-        self.encoder.weight.data.uniform_(-initrange, initrange)
+        # initrange = 0.1
+        # self.encoder.weight.data.uniform_(-initrange, initrange)
         # Do not need to initialize RNN parameters, which have been initialized
         # http://pytorch.org/docs/master/_modules/torch/nn/modules/rnn.html#LSTM
         # self.decoder.weight.data.uniform_(-initrange, initrange)
         # self.decoder.bias.data.fill_(0)
+        pass
 
     def init_hidden(self, bsz):
         weight = next(self.parameters()).data
