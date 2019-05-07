@@ -226,7 +226,8 @@ class Generator(nn.Module):
         a, mu, sigma = self.a(xtext, xtext_lengths)
         b = self.b(ximage)
         ab = self.ab(a, b)
-        c = b + ab
+        # c = b + ab
+        c = ab
         d = self.d(c)
         return d, mu, sigma
 
