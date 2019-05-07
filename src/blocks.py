@@ -19,8 +19,8 @@ class ConditioningAugmentation(nn.Module):
 
 
 class TemporalAverage(nn.Module):
-    def forward(self, x):
-        return torch.mean(x, 1)
+    def forward(self, x, mask):
+        return x.sum(1) / mask.sum(1).unsqueeze(-1)
 
 
 class TextEncoderGenerator(nn.Module):
@@ -50,8 +50,8 @@ class TextEncoderGenerator(nn.Module):
         self.cond_aug = ConditioningAugmentation()
 
     def forward(self, text, text_lengths):
-        words_embs = encode_text(text, text_lengths, self.gru_f, self.gru_b)
-        avg = self.avg(words_embs)
+        words_embs, mask = encode_text(text, text_lengths, self.gru_f, self.gru_b)
+        avg = self.avg(words_embs, mask)
         mu = self.mu_cond_aug(avg)
         sigma = self.sigma_cond_aug(avg)
         final = self.cond_aug(mu, torch.exp(sigma))
@@ -122,7 +122,7 @@ class ConcatABResidualBlocks(nn.Module):
         )
 
     def forward(self, text_embed, image_embed):
-        text_embed = text_embed[:, :, None, None].repeat(1, 1, image_embed.shape[2], image_embed.shape[3])
+        text_embed = text_embed[:, :, None, None].repeat(1, 1, image_embed.size(2), image_embed.size(3))
         x = torch.cat((image_embed, text_embed), 1)
         return self.main(x)
 
@@ -147,21 +147,6 @@ class ResidualBlock(nn.Module):
     def forward(self, x):
         c = self.main(x)
         return c + x
-
-
-class UnconditionalDiscriminator(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.main = nn.Sequential(
-            OrderedDict(
-                [
-                    ("conv", nn.Conv2d(512, 1, 4, 1, 0)),
-                    ("act", nn.Softmax())
-                ]
-            )
-        )
-    def forward(self, x):
-        return self.main(x)
 
 
 class Decoder(nn.Module):
@@ -196,14 +181,6 @@ class Decoder(nn.Module):
 
     def forward(self, x):
         return self.main(x)
-
-
-class TextAdaptiveDiscriminator(nn.Module):
-    pass
-
-
-class ConditionalDiscriminator(nn.Module):
-    pass
 
 
 class Generator(nn.Module):
@@ -389,8 +366,11 @@ def encode_text(text, text_length, gru_f, gru_b):
     hidden_f_mat = torch.zeros(seq_len, batch, gru_f.hidden_size)
     hidden_b_mat = torch.zeros(seq_len, batch, gru_b.hidden_size)
 
+    mask = torch.zeros(batch, seq_len)
+
     for i in range(seq_len):
         is_in_word = ((i < text_length)[:, None]).float()
+        mask[:, i] = is_in_word.squeeze()
 
         hidden_f = gru_f(text[i], hidden_f)
         hidden_f_mat[i] = hidden_f * is_in_word
@@ -398,4 +378,4 @@ def encode_text(text, text_length, gru_f, gru_b):
         hidden_b = gru_b(text[- i - 1], hidden_b)  # -i-1 because the backward pass needs to incorporate both -i and and -i-1 words per hidden state i
         hidden_b_mat[-i] = hidden_b * is_in_word
 
-    return ((hidden_f_mat + hidden_b_mat) / 2.0).permute(1, 0, 2)
+    return ((hidden_f_mat + hidden_b_mat) / 2.0).permute(1, 0, 2), mask
