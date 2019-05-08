@@ -30,9 +30,9 @@ pc.load_fasttext()
 
 # Initialise transform
 tf = transforms.Compose([
+    transforms.RandomRotation((-10, 10)),
     transforms.Resize(136),
     transforms.RandomCrop(128),
-    transforms.RandomRotation((-10, 10)),
     transforms.RandomHorizontalFlip(),
     transforms.ToTensor()
 ])
@@ -52,31 +52,46 @@ generator = Generator(args.max_no_words)
 
 if pretrained_model is not None :
     generator.load_state_dict(pretrained_model, strict=False)
-generator.eval()
 
-# How to call generator
-print("Calling generator")
+if args.runtype == "train" :
+    generator.train()
 
-while True :
-    i = np.random.choice(len(test_set))
-    sample = test_set[i]
+    dataloader = Dataloader(train_set, batch_size=64, num_workers=4, shuffle=True)
 
-    # print("Generating for sample with caption \"{}\"".format(sample["caption"]))
+    for epoch in range(args.no_epochs) :
+        print("Starting epoch {}.".format(epoch+1))
+        for i_batch, sample_batched in enumerate(dataloader):
+            print(i_batch)
+            # Do training
 
-    print("The original caption is \"{}\". Enter your modified caption. \nLeave blank for the original caption".format(sample["caption"]))
-    cap = input()
-    if cap == "" :
-        caption_vec = sample["caption_vector"]
-        no_words = sample["no_words"]
-        cap = sample["caption"]
-    else :
-        caption_vec, no_words = pc.string_to_vector(cap, args.max_no_words)
+elif args.runtype == 'test' :
 
-    generated_orig = generator(sample["tensor"], sample["caption_vector"], torch.Tensor([sample["no_words"]]))
-    generated_mod = generator(sample["tensor"], caption_vec, torch.Tensor([no_words]))
+    # How to call generator
+    print("Calling generator")
+    generator.eval()
 
-    disp_sidebyside([sample["img"], sample["tensor"].squeeze(), generated_orig[0].squeeze(), generated_mod[0].squeeze()], caption=cap)
+    while True :
+        i = np.random.choice(len(test_set))
+        sample = test_set[i]
 
-    prompt = input("Do you want to keep generating more images? (y/n) ")
-    if prompt != "y" :
-        break
+        # print("Generating for sample with caption \"{}\"".format(sample["caption"]))
+
+        print("The original caption is \"{}\". Enter your modified caption. \nLeave blank for the original caption".format(sample["caption"]))
+        cap = input()
+        if cap == "" :
+            caption_vec = sample["caption_vector"]
+            no_words = sample["no_words"]
+            cap = sample["caption"]
+        else :
+            caption_vec, no_words = pc.string_to_vector(cap, args.max_no_words)
+
+        print("running 1")
+        generated_orig = generator(sample["tensor"], sample["caption_vector"], torch.Tensor([sample["no_words"]]))
+        print("running 2")
+        generated_mod = generator(sample["tensor"], caption_vec, torch.Tensor([no_words]))
+
+        disp_sidebyside([sample["img"], sample["tensor"].squeeze(), generated_orig[0].squeeze(), generated_mod[0].squeeze()], caption=cap)
+
+        prompt = input("Do you want to keep generating more images? (y/n) ")
+        if prompt != "y" :
+            break
