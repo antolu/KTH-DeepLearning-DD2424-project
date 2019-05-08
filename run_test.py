@@ -1,5 +1,10 @@
 
 import matplotlib
+import sys
+sys.path.append("src")
+from blocks import Discriminator
+from loss import loss_discriminator, loss_generator
+
 matplotlib.use('tkagg')
 import matplotlib.pyplot as plt
 
@@ -10,7 +15,7 @@ from src.image_io import *
 from src.load_dataset import ParseDatasets, Dataset
 from src.preprocess_caption import PreprocessCaption
 
-import torch
+import torch, torch.optim as optim
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
@@ -48,21 +53,43 @@ if args.pretrained_model is not None :
     pretrained_model = torch.load(args.pretrained_model)
 
 print("Loading pretrained model")
-generator = Generator(args.max_no_words)
+generator = Generator(args.max_no_words).to("cuda:0")
+discriminator = Discriminator(args.max_no_words).to("cuda:0")
 
 if pretrained_model is not None :
     generator.load_state_dict(pretrained_model, strict=False)
 
 if args.runtype == "train" :
     generator.train()
+    discriminator.train()
 
-    dataloader = Dataloader(train_set, batch_size=64, num_workers=4, shuffle=True)
+    od = optim.Adam(generator.parameters(), lr=0.0002, betas=(0.5, 0.999))
+    og = optim.Adam(discriminator.parameters(), lr=0.0002, betas=(0.5, 0.999))
+
+    dataloader = DataLoader(train_set, batch_size=64, num_workers=4, shuffle=True)
 
     for epoch in range(args.no_epochs) :
         print("Starting epoch {}.".format(epoch+1))
         for i_batch, sample_batched in enumerate(dataloader):
             print(i_batch)
             # Do training
+
+            img = sample_batched["tensor"].to("cuda:0")
+            txt = sample_batched["caption_vector"].to("cuda:0")
+
+            n_txt = txt[torch.randperm(64)]
+            txt_len = sample_batched["no_words"].to("cuda:0")
+
+            discriminator.zero_grad()
+            ld = loss_discriminator(img, txt, n_txt, txt_len, discriminator, generator, 10.0)
+            ld.backward()
+            od.step()
+
+            generator.zero_grad()
+            lg = loss_generator(img, txt, n_txt, txt_len, discriminator, generator, 10.0, 2.0)
+            lg.backward()
+            og.step()
+
 
 elif args.runtype == 'test' :
 
