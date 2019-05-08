@@ -1,0 +1,16 @@
+export CUB_IMAGES_ROOT=datasets/cub/CUB_200_2011
+export CUB_CAPTIONS_ROOT=datasets/cub/cub_icml
+export PRETRAINED_CUB_G=cub_G.pth
+
+export OXFORD_IMAGES_ROOT=datasets/oxford/jpg
+export OXFORD_CAPTIONS_ROOT=datasets/oxford/flowers_icml
+export PRETRAINED_OXFORD_G=oxford_G.pth
+
+export COCO_SET=train
+export COCO_IMAGES_ROOT=datasets/coco/${COCO_SET}2017
+export COCO_ANNOTATIONS_ROOT=datasets/coco/annotations
+export COCO_KEYWORDS_FILE=caption_keywords.txt
+export PRETRAINED_COCO_G=coco_G.pth
+
+export FASTTEXT_EMBEDDING=fasttext/wiki.en.bin
+export MAX_NO_WORDS=50

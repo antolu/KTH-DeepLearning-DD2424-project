@@ -14,7 +14,7 @@ class ParseDatasets :
     The resulting data dictionaries have the following structure
     self.train_data = {<filename1>:{"imgpath":<path>, "captionpath":<path>, "img":<img>, "captions":<list of captions>} ... more filenames}
     """
-    def __init__(self, images_root="", captions_root="", dataset_root="", dataset="cub", keywords_file="caption_keywords.txt", data_set="train", max_no_words=50, preprocess_caption=None, transform=None) :
+    def __init__(self, images_root="", annotations_root="", dataset="cub", keywords_file="caption_keywords.txt", data_set="train", max_no_words=50, preprocess_caption=None, transform=None) :
         """
         Initialises this class for one dataset
         :param images_root The root directory of the images of this dataset
@@ -22,8 +22,7 @@ class ParseDatasets :
         """
         super().__init__()
         self.images_root = images_root
-        self.captions_root = captions_root
-        self.dataset_root = dataset_root
+        self.annotations_root = annotations_root
         self.dataset = dataset
         self.data_set = data_set
 
@@ -41,9 +40,13 @@ class ParseDatasets :
         self.val = None
         self.test = None
 
-        if dataset != "coco" :
-            if not os.path.exists(self.captions_root) :
-                raise "Path" + self.captions_root + "does not exist!"
+        self.data_is_parsed = False
+
+
+    def parse_datasets(self) :
+        if self.dataset != "coco" :
+            if not os.path.exists(self.annotations_root) :
+                raise "Path" + self.annotations_root + "does not exist!"
             
             if not os.path.exists(self.images_root) :
                 raise "Path" + self.images_root + "does not exist!"
@@ -51,8 +54,10 @@ class ParseDatasets :
             self.read_data_paths()
         else :
             self.__read_coco_keywords()
-            self.__read_coco_annotations(set=data_set)
+            self.__read_coco_annotations(set=self.data_set)
             self.__filter_coco_annotations()
+
+        self.data_is_parsed = True
 
 
     def __read_coco_keywords(self):
@@ -80,8 +85,8 @@ class ParseDatasets :
         else :
             raise "set option " + set + " was not recognized!"
 
-        captionFile = '{}/annotations/captions_{}.json'.format(self.dataset_root, dataType)
-        annFile = '{}/annotations/instances_{}.json'.format(self.dataset_root, dataType)
+        captionFile = '{}/captions_{}.json'.format(self.annotations_root, dataType)
+        annFile = '{}/instances_{}.json'.format(self.annotations_root, dataType)
 
         self.coco = COCO(annFile)
         self.coco_caps = COCO(captionFile)
@@ -149,7 +154,7 @@ class ParseDatasets :
         image_id = str(image_id)
         image_id = (12-len(image_id)) * "0" + image_id
 
-        image_path = '{}/{}/{}.jpg'.format(self.dataset_root, dataType, image_id)
+        image_path = '{}/{}/{}.jpg'.format(self.images_root, dataType, image_id)
 
         return image_path
 
@@ -260,12 +265,12 @@ class ParseDatasets :
                 elif data_split[imgId] == "0" :
                     test_data[filename] = {"imgpath": filepath}
 
-        with open(os.path.join(self.captions_root, "allclasses.txt")) as f :
+        with open(os.path.join(self.annotations_root, "allclasses.txt")) as f :
             allclasses = [line.rstrip() for line in f]
 
         # Find paths of the captions files
         for dataclass in allclasses :
-            dataclass_dir = os.path.join(self.captions_root, dataclass)
+            dataclass_dir = os.path.join(self.annotations_root, dataclass)
             for filename in os.listdir(dataclass_dir) :
                 filepath = os.path.join(dataclass_dir, filename)
 
@@ -373,6 +378,9 @@ class ParseDatasets :
 
 
     def get_datasets(self) :
+        if not self.data_is_parsed :
+            self.parse_datasets()
+            
         return self.train, self.val, self.test
 
 
@@ -407,7 +415,7 @@ class Dataset(data.Dataset, ParseDatasets) :
         else :
             img = data["img"]
 
-        tnsr_img = self.transform(img)
+        tnsr_img = self.transform(img).unsqueeze(0)
 
         rand_caption = captions[np.random.choice(len(captions))]
 

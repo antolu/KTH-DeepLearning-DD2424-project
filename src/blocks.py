@@ -1,13 +1,8 @@
 # TAGAN implementation
 from collections import OrderedDict
 
-from torch import randn
-from torch.autograd import Variable
-
 import torch
 import torch.nn as nn
-from torch.autograd import Variable
-from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 import torch.nn.functional as F
 import numpy as np
 
@@ -17,23 +12,22 @@ class ConditioningAugmentation(nn.Module):
         super().__init__()
 
     def forward(self, mu, sigma):
-        return torch.randn(mu.shape) * sigma + mu
+        res = torch.zeros_like(mu)
+        for i in range(mu.size(0)):
+            res[i] = torch.randn(mu[i].shape) * sigma[i] + mu[i]
+        return res
 
 
 class TemporalAverage(nn.Module):
-    def forward(self, x):
-        return torch.mean(x, 1)
-
-class TextEncoderDiscriminator(nn.Module):
-    pass
+    def forward(self, x, mask):
+        return x.sum(1) / mask.sum(1).unsqueeze(-1)
 
 
 class TextEncoderGenerator(nn.Module):
     def __init__(self, num_words):
         super().__init__()
-        self.text_encoder = RNN_ENCODER(num_words, ninput=300, drop_prob=0.5,
-                                        nhidden=1024, nlayers=1, bidirectional=True,
-                                        rnn_type="GRU")
+        self.gru_f = nn.GRUCell(input_size=300, hidden_size=512)
+        self.gru_b = nn.GRUCell(input_size=300, hidden_size=512)
         self.avg = TemporalAverage()
         self.mu_cond_aug = nn.Sequential(
             OrderedDict(
@@ -56,14 +50,12 @@ class TextEncoderGenerator(nn.Module):
         self.cond_aug = ConditioningAugmentation()
 
     def forward(self, text, text_lengths):
-        batch_size = text.size(0)
-        hidden = self.text_encoder.init_hidden(batch_size)
-        words_embs = self.text_encoder(text, text_lengths, hidden)
-        avg = self.avg(words_embs)
+        words_embs, mask = encode_text(text, text_lengths, self.gru_f, self.gru_b)
+        avg = self.avg(words_embs, mask)
         mu = self.mu_cond_aug(avg)
-        sigma = self.mu_cond_aug(avg)
-        final = self.cond_aug(mu, sigma)
-        return final
+        sigma = self.sigma_cond_aug(avg)
+        final = self.cond_aug(mu, torch.exp(sigma))
+        return final, mu, torch.exp(sigma)
 
 
 class ImageEncoderDiscriminator(nn.Module):
@@ -86,97 +78,6 @@ class ImageEncoderDiscriminator(nn.Module):
 
     def forward(self, im):
         return self.main(im)
-
-
-# ############## Text2Image Encoder-Decoder #######
-class RNN_ENCODER(nn.Module):
-    def __init__(self, ntoken, ninput=300, drop_prob=0.5,
-                 nhidden=1024, nlayers=1, bidirectional=True,
-                 rnn_type="GRU"):
-        super(RNN_ENCODER, self).__init__()
-        self.ntoken = ntoken  # size of the dictionary
-        self.ninput = ninput  # size of each embedding vector
-        self.drop_prob = drop_prob  # probability of an element to be zeroed
-        self.nlayers = nlayers  # Number of recurrent layers
-        self.bidirectional = bidirectional
-        self.rnn_type = rnn_type
-        if bidirectional:
-            self.num_directions = 2
-        else:
-            self.num_directions = 1
-        # number of features in the hidden state
-        self.nhidden = nhidden // self.num_directions
-
-        self.define_module()
-        self.init_weights()
-
-    def define_module(self):
-        # self.encoder = nn.Embedding(self.ntoken, self.ninput)
-        self.drop = nn.Dropout(self.drop_prob)
-        if self.rnn_type == 'LSTM':
-            # dropout: If non-zero, introduces a dropout layer on
-            # the outputs of each RNN layer except the last layer
-            self.rnn = nn.LSTM(self.ninput, self.nhidden,
-                               self.nlayers, batch_first=True,
-                               dropout=self.drop_prob,
-                               bidirectional=self.bidirectional)
-        elif self.rnn_type == 'GRU':
-            self.rnn = nn.GRU(self.ninput, self.nhidden,
-                              self.nlayers, batch_first=True,
-                              dropout=self.drop_prob,
-                              bidirectional=self.bidirectional)
-        else:
-            raise NotImplementedError
-
-    def init_weights(self):
-        # initrange = 0.1
-        # self.encoder.weight.data.uniform_(-initrange, initrange)
-        # Do not need to initialize RNN parameters, which have been initialized
-        # http://pytorch.org/docs/master/_modules/torch/nn/modules/rnn.html#LSTM
-        # self.decoder.weight.data.uniform_(-initrange, initrange)
-        # self.decoder.bias.data.fill_(0)
-        pass
-
-    def init_hidden(self, bsz):
-        weight = next(self.parameters()).data
-        if self.rnn_type == 'LSTM':
-            return (Variable(weight.new(self.nlayers * self.num_directions,
-                                        bsz, self.nhidden).zero_()),
-                    Variable(weight.new(self.nlayers * self.num_directions,
-                                        bsz, self.nhidden).zero_()))
-        else:
-            return Variable(weight.new(self.nlayers * self.num_directions,
-                                       bsz, self.nhidden).zero_())
-
-    def forward(self, captions, cap_lens, hidden, mask=None):
-        # # input: torch.LongTensor of size batch x n_steps
-        # # --> emb: batch x n_steps x ninput
-        # emb = self.drop(self.encoder(captions))
-        # #
-        # # Returns: a PackedSequence object
-        # cap_lens = cap_lens.data.tolist()
-        # emb = pack_padded_sequence(emb, cap_lens, batch_first=True)
-        # #hidden and memory (num_layers * num_directions, batch, hidden_size):
-        # tensor containing the initial hidden state for each element in batch.
-        # #output (batch, seq_len, hidden_size * num_directions)
-        # #or a PackedSequence object:
-        # tensor containing output features (h_t) from the last layer of RNN
-        output, hidden = self.rnn(captions, hidden)
-        # PackedSequence object
-        # --> (batch, seq_len, hidden_size * num_directions)
-        # output = pad_packed_sequence(output, batch_first=True)[0]
-        # output = self.drop(output)
-        # --> batch x hidden_size*num_directions x seq_len
-        # words_emb = output.transpose(1, 2)
-        words_emb = output
-        # --> batch x num_directions*hidden_size
-        # if self.rnn_type == 'LSTM':
-        #     sent_emb = hidden[0].transpose(0, 1).contiguous()
-        # else:
-        #     sent_emb = hidden.transpose(0, 1).contiguous()
-        # sent_emb = sent_emb.view(-1, self.nhidden * self.num_directions)
-        # return words_emb, sent_emb
-        return words_emb
 
 
 class ImageEncoderGenerator(nn.Module):
@@ -211,6 +112,7 @@ class ConcatABResidualBlocks(nn.Module):
                 [
                     ("conv1", nn.Conv2d(640, 512, 3, 1, 1)),
                     ("bn1", nn.BatchNorm2d(512)),
+                    ("relu1", nn.ReLU()),
                     ("res1", ResidualBlock(512, 512)),
                     ("res2", ResidualBlock(512, 512)),
                     ("res3", ResidualBlock(512, 512)),
@@ -220,7 +122,7 @@ class ConcatABResidualBlocks(nn.Module):
         )
 
     def forward(self, text_embed, image_embed):
-        text_embed = text_embed[:, :, None, None].repeat(1, 1, image_embed.shape[2], image_embed.shape[3])
+        text_embed = text_embed[:, :, None, None].repeat(1, 1, image_embed.size(2), image_embed.size(3))
         x = torch.cat((image_embed, text_embed), 1)
         return self.main(x)
 
@@ -245,21 +147,6 @@ class ResidualBlock(nn.Module):
     def forward(self, x):
         c = self.main(x)
         return c + x
-
-
-class UnconditionalDiscriminator(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.main = nn.Sequential(
-            OrderedDict(
-                [
-                    ("conv", nn.Conv2d(512, 1, 4, 1, 0)),
-                    ("act", nn.Softmax())
-                ]
-            )
-        )
-    def forward(self, x):
-        return self.main(x)
 
 
 class Decoder(nn.Module):
@@ -296,14 +183,6 @@ class Decoder(nn.Module):
         return self.main(x)
 
 
-class TextAdaptiveDiscriminator(nn.Module):
-    pass
-
-
-class ConditionalDiscriminator(nn.Module):
-    pass
-
-
 class Generator(nn.Module):
     def __init__(self, num_words):
         super().__init__()
@@ -314,17 +193,15 @@ class Generator(nn.Module):
         self.d = Decoder()
         self.apply(initialize_parameters)
 
-        # We keep this here for training the conditioning augmentation (https://arxiv.org/pdf/1612.03242.pdf eq 2)
-        self.cond_aug_params = self.a.mu_cond_aug, self.a.sigma_cond_aug
-
     def forward(self, ximage, xtext, xtext_lengths):
         # x includes both the text and the image
-        a = self.a(xtext, xtext_lengths)
+        a, mu, sigma = self.a(xtext, xtext_lengths)
         b = self.b(ximage)
         ab = self.ab(a, b)
-        c = b + ab
-        d = self.d(c)
-        return d
+        # c = b + ab
+        c = ab
+        d = self.d(b + c)
+        return d, mu, sigma
 
 
 class Discriminator(nn.Module):
@@ -369,9 +246,8 @@ class Discriminator(nn.Module):
             nn.Softmax()
         )
 
-        self.text_encoder = RNN_ENCODER(num_words, ninput=300, drop_prob=0.5,
-                                        nhidden=512, nlayers=1, bidirectional=True,
-                                        n_steps=30, rnn_type="GRU")
+        self.gru_f = nn.GRUCell(input_size=300, hidden_size=512)
+        self.gru_b = nn.GRUCell(input_size=300, hidden_size=512)
         self.avg = TemporalAverage()
 
 
@@ -403,7 +279,7 @@ class Discriminator(nn.Module):
 
         self.apply(initialize_parameters)
 
-    def forward(self, image, text, len_text, negative=False):
+    def forward(self, image, text=None, len_text=None, negative=False):
 
         image1 = self.conv3(image)
         image2 = self.conv4(image1)
@@ -413,11 +289,11 @@ class Discriminator(nn.Module):
         GAP_image3 = self.GAP3(image3)
         GAP_images = [GAP_image1, GAP_image2, GAP_image3]
         d = self.un_disc(GAP_image3).squeeze()
+        if (text is None):
+            return d
 
         # Get word embedding
-        batch_size = text.size(0)
-        hidden = self.text_encoder.init_hidden(batch_size)
-        words_embs = self.text_encoder(text, len_text, hidden)
+        words_embs = encode_text(text, len_text, self.gru_f, self.gru_b)
         avg = self.avg(words_embs).unsqueeze(-1)
 
         # Calculate attentions
@@ -456,12 +332,12 @@ class Discriminator(nn.Module):
 
         if negative:
             alphas_neg = alphas[idx_neg, :]  # need to change this
-            total_neg = total_neg.t().pow(alphas_neg.t()).prod(0)  # total_neg should be (batch_size)
-        total = total.t().pow(alphas.t()).prod(0)  # total should be (batch_size)
+            total_neg = (alphas_neg*torch.log(total_neg)).sum(1)  # total_neg should be (batch_size)
+        total = (alphas*torch.log(total)).sum(1)  # total should be (batch_size)
 
         if negative:
-            return d, total, total_neg
-        return d, total
+            return torch.exp(total_neg)
+        return torch.exp(total)
 
 
 def initialize_parameters(model):
@@ -475,3 +351,31 @@ def initialize_parameters(model):
             model.weight.data.normal_(1, 0.02)
         if model.bias.requires_grad:
             model.bias.data.fill_(0)
+
+def encode_text(text, text_length, gru_f, gru_b):
+    batch, seq_len, input_size = text.shape
+
+    if text_length.size(0) != batch:
+        raise ValueError
+
+    hidden_f = torch.zeros(batch, gru_f.hidden_size)
+    hidden_b = torch.zeros(batch, gru_b.hidden_size)
+
+    text = text.permute(1, 0, 2)
+
+    hidden_f_mat = torch.zeros(seq_len, batch, gru_f.hidden_size)
+    hidden_b_mat = torch.zeros(seq_len, batch, gru_b.hidden_size)
+
+    mask = torch.zeros(batch, seq_len)
+
+    for i in range(seq_len):
+        is_in_word = ((i < text_length)[:, None]).float()
+        mask[:, i] = is_in_word.squeeze()
+
+        hidden_f = gru_f(text[i], hidden_f)
+        hidden_f_mat[i] = hidden_f * is_in_word
+
+        hidden_b = gru_b(text[- i - 1], hidden_b)  # -i-1 because the backward pass needs to incorporate both -i and and -i-1 words per hidden state i
+        hidden_b_mat[-i] = hidden_b * is_in_word
+
+    return ((hidden_f_mat + hidden_b_mat) / 2.0).permute(1, 0, 2), mask
