@@ -14,7 +14,7 @@ class ConditioningAugmentation(nn.Module):
     def forward(self, mu, sigma):
         res = torch.zeros_like(mu)
         for i in range(mu.size(0)):
-            res[i] = torch.randn(mu[i].shape) * sigma[i] + mu[i]
+            res[i] = torch.randn(mu[i].shape).to("cuda:0") * sigma[i] + mu[i]
         return res
 
 
@@ -28,6 +28,7 @@ class TextEncoderGenerator(nn.Module):
         super().__init__()
         self.gru_f = nn.GRUCell(input_size=300, hidden_size=512)
         self.gru_b = nn.GRUCell(input_size=300, hidden_size=512)
+
         self.avg = TemporalAverage()
         self.mu_cond_aug = nn.Sequential(
             OrderedDict(
@@ -235,8 +236,8 @@ class Discriminator(nn.Module):
 
         # UNCONDITIONAL DISCRIMINATOR
         self.un_disc = nn.Sequential(
-            nn.Conv2d(512, 1, 4),
-            nn.Softmax()
+            nn.Conv2d(512, 1, 4, padding=0, stride=1),
+            nn.Softmax()  # TODO: do we use this?
         )
 
 
@@ -290,7 +291,7 @@ class Discriminator(nn.Module):
         GAP_images = [GAP_image1, GAP_image2, GAP_image3]
         d = self.un_disc(GAP_image3).squeeze()
         if (text is None):
-            return d
+            return d.squeeze()
 
         # Get word embedding
         words_embs, mask = encode_text(text, len_text, self.gru_f, self.gru_b)
@@ -298,7 +299,7 @@ class Discriminator(nn.Module):
 
         # Calculate attentions
         u_dot_wi = torch.bmm(words_embs, avg).squeeze(-1)
-        alphas = F.softmax(u_dot_wi)
+        alphas = F.softmax(u_dot_wi).permute(0, 1)
 
         # Get weights
         betas = self.get_betas(words_embs)
@@ -358,15 +359,15 @@ def encode_text(text, text_length, gru_f, gru_b):
     if text_length.size(0) != batch:
         raise ValueError
 
-    hidden_f = torch.zeros(batch, gru_f.hidden_size)
-    hidden_b = torch.zeros(batch, gru_b.hidden_size)
+    hidden_f = torch.zeros(batch, gru_f.hidden_size).to("cuda:0")
+    hidden_b = torch.zeros(batch, gru_b.hidden_size).to("cuda:0")
 
     text = text.permute(1, 0, 2)
 
-    hidden_f_mat = torch.zeros(seq_len, batch, gru_f.hidden_size)
-    hidden_b_mat = torch.zeros(seq_len, batch, gru_b.hidden_size)
+    hidden_f_mat = torch.zeros(seq_len, batch, gru_f.hidden_size).to("cuda:0")
+    hidden_b_mat = torch.zeros(seq_len, batch, gru_b.hidden_size).to("cuda:0")
 
-    mask = torch.zeros(batch, seq_len)
+    mask = torch.zeros(batch, seq_len).to("cuda:0")
 
     for i in range(seq_len):
         is_in_word = ((i < text_length)[:, None]).float()
