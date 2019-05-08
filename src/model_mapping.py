@@ -63,10 +63,10 @@ class ParseMapping :
         return self.mapped_parameters
 
 # Usage example 
-pm = ParseMapping("mapping.txt", their_model_file="models/flowers_G.pth", our_model_file="our_model.pth")
+# pm = ParseMapping("mapping.txt", their_model_file="models/flowers_G.pth", our_model_file="our_model.pth")
 
-pm.parse()
-pm.write_mapping()
+# pm.parse()
+# pm.write_mapping()
 
 # mapping = pm.mapped_parameters
 
