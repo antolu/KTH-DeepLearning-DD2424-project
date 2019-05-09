@@ -2,21 +2,27 @@
 # Maps the pretrained parameters to our structure and saves it
 ################################################################
 
-from src.model_mapping import ParseMapping
+from tools.model_mapping import ParseMapping
+from blocks import Generator, Discriminator
+import argparse
 
-models=[
-    {
-        "their_model":"models/flowers_G.pth",
-        "output_name":"oxford_G.pth"
-    },
-    {
-        "their_model":"models/birds_G.pth",
-        "output_name":"cub_G.pth"
-    }
-]
+parser = argparse.ArgumentParser()
 
-for model in models :
-    pm = ParseMapping("mapping.txt", their_model_file=model["their_model"], our_model_file="our_model.pth")
+parser.add_argument("--pretrained", type=str, required=True)
+parser.add_argument("--mapping", type=str, required=True)
+parser.add_argument("--output", type=str, required=True)
+parser.add_argument("--gendisc", type=str, required=True)
 
-    pm.parse()
-    pm.write_mapping(model["output_name"])
+args = parser.parse()
+
+if args.gendisc.lower() == "g" :
+    g = Generator(50)
+    our_model = g.state_dict()
+elif args.gendisc.lower() == "d" :
+    d = Discriminator()
+    our_model = d.state_dict()
+
+pm = ParseMapping(args.mapping, their_model_file=args.pretrained, our_model=our_model)
+
+pm.parse()
+pm.write_mapping(args.output)
