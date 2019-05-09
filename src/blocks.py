@@ -15,7 +15,7 @@ class ConditioningAugmentation(nn.Module):
     def forward(self, mu, sigma):
         res = torch.zeros_like(mu)
         for i in range(mu.size(0)):
-            res[i] = torch.randn(mu[i].shape).to(device) * sigma[i] + mu[i]
+            res[i] = torch.randn(mu[i].shape).to(self.device) * sigma[i] + mu[i]
         return res
 
 
@@ -28,8 +28,8 @@ class TextEncoderGenerator(nn.Module):
     def __init__(self, num_words, device="cpu"):
         super().__init__()
         self.device = device
-        self.gru_f = nn.GRUCell(input_size=300, hidden_size=512)
-        self.gru_b = nn.GRUCell(input_size=300, hidden_size=512)
+        self.gru_f = nn.GRUCell(input_size=300, hidden_size=512).to(device)
+        self.gru_b = nn.GRUCell(input_size=300, hidden_size=512).to(device)
 
         self.avg = TemporalAverage()
         self.mu_cond_aug = nn.Sequential(
@@ -53,7 +53,7 @@ class TextEncoderGenerator(nn.Module):
         self.cond_aug = ConditioningAugmentation(device)
 
     def forward(self, text, text_lengths):
-        words_embs, mask = encode_text(text, text_lengths, self.gru_f, self.gru_b)
+        words_embs, mask = encode_text(text, text_lengths, self.gru_f, self.gru_b, self.device)
         avg = self.avg(words_embs, mask)
         mu = self.mu_cond_aug(avg)
         sigma = self.sigma_cond_aug(avg)
@@ -190,7 +190,7 @@ class Generator(nn.Module):
     def __init__(self, num_words, device="cpu"):
         super().__init__()
         self.device = device
-        self.a = TextEncoderGenerator(num_words)
+        self.a = TextEncoderGenerator(num_words, device)
         self.b = ImageEncoderGenerator()
         self.ab = ConcatABResidualBlocks()
 
