@@ -423,4 +423,4 @@ class Dataset(data.Dataset, ParseDatasets) :
 
         # ret = {"img":img, "tensor":tnsr_img, "caption_vector":caption_vector, "no_words":no_words, "caption":rand_caption}
 
-        return tnsr_img, caption_vector, no_words
+        return tnsr_img, caption_vector, no_words, rand_caption, img
