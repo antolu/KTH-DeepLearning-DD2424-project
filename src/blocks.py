@@ -8,13 +8,14 @@ import numpy as np
 
 
 class ConditioningAugmentation(nn.Module):
-    def __init__(self):
+    def __init__(self, device="cpu"):
         super().__init__()
+        self.device = device
 
     def forward(self, mu, sigma):
         res = torch.zeros_like(mu)
         for i in range(mu.size(0)):
-            res[i] = torch.randn(mu[i].shape).to("cuda:0") * sigma[i] + mu[i]
+            res[i] = torch.randn(mu[i].shape).to(device) * sigma[i] + mu[i]
         return res
 
 
@@ -24,8 +25,9 @@ class TemporalAverage(nn.Module):
 
 
 class TextEncoderGenerator(nn.Module):
-    def __init__(self, num_words):
+    def __init__(self, num_words, device="cpu"):
         super().__init__()
+        self.device = device
         self.gru_f = nn.GRUCell(input_size=300, hidden_size=512)
         self.gru_b = nn.GRUCell(input_size=300, hidden_size=512)
 
@@ -48,7 +50,7 @@ class TextEncoderGenerator(nn.Module):
             )
         )
 
-        self.cond_aug = ConditioningAugmentation()
+        self.cond_aug = ConditioningAugmentation(device)
 
     def forward(self, text, text_lengths):
         words_embs, mask = encode_text(text, text_lengths, self.gru_f, self.gru_b)
@@ -185,8 +187,9 @@ class Decoder(nn.Module):
 
 
 class Generator(nn.Module):
-    def __init__(self, num_words):
+    def __init__(self, num_words, device="cpu"):
         super().__init__()
+        self.device = device
         self.a = TextEncoderGenerator(num_words)
         self.b = ImageEncoderGenerator()
         self.ab = ConcatABResidualBlocks()
@@ -206,8 +209,9 @@ class Generator(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, num_words):
+    def __init__(self, num_words, device="cpu"):
         super().__init__()
+        self.device = device
 
         # IMAGE ENCODER
         self.conv3 = nn.Sequential(
@@ -359,15 +363,15 @@ def encode_text(text, text_length, gru_f, gru_b):
     if text_length.size(0) != batch:
         raise ValueError
 
-    hidden_f = torch.zeros(batch, gru_f.hidden_size).to("cuda:0")
-    hidden_b = torch.zeros(batch, gru_b.hidden_size).to("cuda:0")
+    hidden_f = torch.zeros(batch, gru_f.hidden_size).to(self.device)
+    hidden_b = torch.zeros(batch, gru_b.hidden_size).to(self.device)
 
     text = text.permute(1, 0, 2)
 
-    hidden_f_mat = torch.zeros(seq_len, batch, gru_f.hidden_size).to("cuda:0")
-    hidden_b_mat = torch.zeros(seq_len, batch, gru_b.hidden_size).to("cuda:0")
+    hidden_f_mat = torch.zeros(seq_len, batch, gru_f.hidden_size).to(self.device)
+    hidden_b_mat = torch.zeros(seq_len, batch, gru_b.hidden_size).to(self.device)
 
-    mask = torch.zeros(batch, seq_len).to("cuda:0")
+    mask = torch.zeros(batch, seq_len).to(self.device)
 
     for i in range(seq_len):
         is_in_word = ((i < text_length)[:, None]).float()
