@@ -298,7 +298,7 @@ class Discriminator(nn.Module):
             return d.squeeze()
 
         # Get word embedding
-        words_embs, mask = encode_text(text, len_text, self.gru_f, self.gru_b)
+        words_embs, mask = encode_text(text, len_text, self.gru_f, self.gru_b, self.device)
         avg = self.avg(words_embs, mask).unsqueeze(-1)
 
         # Calculate attentions
@@ -357,21 +357,21 @@ def initialize_parameters(model):
         if model.bias.requires_grad:
             model.bias.data.fill_(0)
 
-def encode_text(text, text_length, gru_f, gru_b):
+def encode_text(text, text_length, gru_f, gru_b, device="cpu"):
     batch, seq_len, input_size = text.shape
 
     if text_length.size(0) != batch:
         raise ValueError
 
-    hidden_f = torch.zeros(batch, gru_f.hidden_size).to(self.device)
-    hidden_b = torch.zeros(batch, gru_b.hidden_size).to(self.device)
+    hidden_f = torch.zeros(batch, gru_f.hidden_size).to(device)
+    hidden_b = torch.zeros(batch, gru_b.hidden_size).to(device)
 
     text = text.permute(1, 0, 2)
 
-    hidden_f_mat = torch.zeros(seq_len, batch, gru_f.hidden_size).to(self.device)
-    hidden_b_mat = torch.zeros(seq_len, batch, gru_b.hidden_size).to(self.device)
+    hidden_f_mat = torch.zeros(seq_len, batch, gru_f.hidden_size).to(device)
+    hidden_b_mat = torch.zeros(seq_len, batch, gru_b.hidden_size).to(device)
 
-    mask = torch.zeros(batch, seq_len).to(self.device)
+    mask = torch.zeros(batch, seq_len).to(device)
 
     for i in range(seq_len):
         is_in_word = ((i < text_length)[:, None]).float()
