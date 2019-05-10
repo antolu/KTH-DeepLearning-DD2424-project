@@ -223,11 +223,16 @@ class Discriminator(nn.Module):
             nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(128, 256, 4, 2, padding=1, bias=False),
             nn.BatchNorm2d(256),
+            nn.LeakyReLU(0.2, inplace=True),
+            # Added to comply author's parameters
+            nn.Conv2d(256, 512, 4, 2, padding=1, bias=False),
+            nn.BatchNorm2d(512),
             nn.LeakyReLU(0.2, inplace=True)
         )
 
         self.conv4 = nn.Sequential(
-            nn.Conv2d(256, 512, 4, 2, padding=1, bias=False),
+            # nn.Conv2d(256, 512, 4, 2, padding=1, bias=False),
+            nn.Conv2d(512, 512, 4, 2, padding=1, bias=False),
             nn.BatchNorm2d(512),
             nn.LeakyReLU(0.2, inplace=True)
         )
