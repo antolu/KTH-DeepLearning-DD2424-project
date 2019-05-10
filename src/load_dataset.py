@@ -46,10 +46,10 @@ class ParseDatasets :
     def parse_datasets(self) :
         if self.dataset != "coco" :
             if not os.path.exists(self.annotations_root) :
-                raise "Path" + self.annotations_root + "does not exist!"
+                raise Exception("Path " + self.annotations_root + "does not exist!")
             
             if not os.path.exists(self.images_root) :
-                raise "Path" + self.images_root + "does not exist!"
+                raise Exception("Path " + self.images_root + "does not exist!")
 
             self.read_data_paths()
         else :
@@ -423,4 +423,4 @@ class Dataset(data.Dataset, ParseDatasets) :
 
         # ret = {"img":img, "tensor":tnsr_img, "caption_vector":caption_vector, "no_words":no_words, "caption":rand_caption}
 
-        return tnsr_img, caption_vector, no_words, rand_caption, img
+        return tnsr_img, caption_vector, no_words
