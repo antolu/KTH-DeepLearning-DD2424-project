@@ -15,6 +15,7 @@ class ConditioningAugmentation(nn.Module):
         res = torch.zeros_like(mu)
         for i in range(mu.size(0)):
             res[i] = torch.randn(mu[i].shape).to("cuda:0") * sigma[i] + mu[i]
+            # res[i] = torch.ones(mu[i].shape).to("cuda:0") * sigma[i] + mu[i]
         return res
 
 
@@ -54,9 +55,9 @@ class TextEncoderGenerator(nn.Module):
         words_embs, mask = encode_text(text, text_lengths, self.gru_f, self.gru_b)
         avg = self.avg(words_embs, mask)
         mu = self.mu_cond_aug(avg)
-        sigma = self.sigma_cond_aug(avg)
-        final = self.cond_aug(mu, torch.exp(sigma))
-        return final, mu, torch.exp(sigma)
+        log_sigma = self.sigma_cond_aug(avg)
+        final = self.cond_aug(mu, torch.exp(log_sigma))
+        return final, mu, torch.exp(log_sigma)
 
 
 class ImageEncoderDiscriminator(nn.Module):
