@@ -73,23 +73,19 @@ if args.runtype == "train" :
 
     for epoch in range(args.no_epochs) :
         print("Starting epoch {}.".format(epoch+1))
-        for i_batch, (img, caption, no_words, _, _) in enumerate(dataloader):
+        for i_batch, (img, caption, no_words) in enumerate(dataloader):
             print(i_batch)
             # Do training
 
             img, caption, no_words = img.to(device), caption.to(device), no_words.to(device)
 
-            rand = torch.randperm(64)
-            n_caption = caption[rand]
-            n_no_words = no_words[rand]
-
             discriminator.zero_grad()
-            ld = loss_discriminator(img, caption, n_caption, no_words, discriminator, generator, 10.0)
+            ld = loss_discriminator(img, caption, no_words, discriminator, generator, 10.0)
             ld.backward()
             od.step()
 
             generator.zero_grad()
-            lg = loss_generator(img, caption, n_caption, no_words, discriminator, generator, 10.0, 2.0)
+            lg = loss_generator(img, caption, no_words, discriminator, generator, 10.0, 2.0)
             lg.backward()
             og.step()
 
