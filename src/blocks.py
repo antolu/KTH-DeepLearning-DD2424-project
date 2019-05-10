@@ -86,19 +86,20 @@ class ImageEncoderGenerator(nn.Module):
         super().__init__()
         self.main = nn.Sequential(OrderedDict([
             ('conv1', nn.Conv2d(3, 64, 3, 1, 1)),
-            ('act1', nn.ReLU()),
+            ('act1', nn.ReLU(inplace=True)),
 
-            ('conv2', nn.Conv2d(64, 128, 4, 2, 1)),
+            # BN already includes a bias
+            ('conv2', nn.Conv2d(64, 128, 4, 2, 1, bias=False)),
             ('bn2', nn.BatchNorm2d(128)),
-            ('act2', nn.ReLU()),
+            ('act2', nn.ReLU(inplace=True)),
 
-            ('conv3', nn.Conv2d(128, 256, 4, 2, 1)),
+            ('conv3', nn.Conv2d(128, 256, 4, 2, 1, bias=False)),
             ('bn3', nn.BatchNorm2d(256)),
-            ('act3', nn.ReLU()),
+            ('act3', nn.ReLU(inplace=True)),
 
-            ('conv4', nn.Conv2d(256, 512, 4, 2, 1)),
+            ('conv4', nn.Conv2d(256, 512, 4, 2, 1, bias=False)),
             ('bn4', nn.BatchNorm2d(512)),
-            ('act4', nn.ReLU())
+            ('act4', nn.ReLU(inplace=True))
         ]))
 
     def forward(self, im):
@@ -111,9 +112,9 @@ class ConcatABResidualBlocks(nn.Module):
         self.main = nn.Sequential(
             OrderedDict(
                 [
-                    ("conv1", nn.Conv2d(640, 512, 3, 1, 1)),
+                    ("conv1", nn.Conv2d(640, 512, 3, 1, 1, bias=False)),
                     ("bn1", nn.BatchNorm2d(512)),
-                    ("relu1", nn.ReLU()),
+                    ("relu1", nn.ReLU(inplace=True)),
                     ("res1", ResidualBlock(512, 512)),
                     ("res2", ResidualBlock(512, 512)),
                     ("res3", ResidualBlock(512, 512)),
@@ -136,10 +137,10 @@ class ResidualBlock(nn.Module):
         self.main = nn.Sequential(
             OrderedDict(
                 [
-                    ("conv1", nn.Conv2d(512, 512, 3, 1, 1)),
+                    ("conv1", nn.Conv2d(512, 512, 3, 1, 1, bias=False)),
                     ("bn1", nn.BatchNorm2d(512)),
-                    ("relu1", nn.ReLU()),
-                    ("conv2", nn.Conv2d(512, 512, 3, 1, 1)),
+                    ("relu1", nn.ReLU(inplace=True)),
+                    ("conv2", nn.Conv2d(512, 512, 3, 1, 1, bias=False)),
                     ("bn2", nn.BatchNorm2d(512))
                 ]
             )
@@ -158,21 +159,21 @@ class Decoder(nn.Module):
                 [
                     ("upsampling1", nn.Upsample(scale_factor=2)),
 
-                    ("conv1", nn.Conv2d(512, 256, 3, 1, 1)),
+                    ("conv1", nn.Conv2d(512, 256, 3, 1, 1, bias=False)),
                     ("bn1", nn.BatchNorm2d(256)),
-                    ("relu1", nn.ReLU()),
+                    ("relu1", nn.ReLU(inplace=True)),
 
                     ("upsampling2", nn.Upsample(scale_factor=2)),
 
-                    ("conv2", nn.Conv2d(256, 128, 3, 1, 1)),
+                    ("conv2", nn.Conv2d(256, 128, 3, 1, 1, bias=False)),
                     ("bn2", nn.BatchNorm2d(128)),
-                    ("relu2", nn.ReLU()),
+                    ("relu2", nn.ReLU(inplace=True)),
 
                     ("upsampling3", nn.Upsample(scale_factor=2)),
 
-                    ("conv3", nn.Conv2d(128, 64, 3, 1, 1)),
+                    ("conv3", nn.Conv2d(128, 64, 3, 1, 1, bias=False)),
                     ("bn3", nn.BatchNorm2d(64)),
-                    ("relu3", nn.ReLU()),
+                    ("relu3", nn.ReLU(inplace=True)),
 
                     ("conv4", nn.Conv2d(64, 3, 3, 1, 1)),
                     ("tanh", nn.Tanh())
@@ -196,8 +197,8 @@ class Generator(nn.Module):
 
     def forward(self, ximage, xtext, xtext_lengths):
         # x includes both the text and the image
-        a, mu, sigma = self.a(xtext, xtext_lengths)
         b = self.b(ximage)
+        a, mu, sigma = self.a(xtext, xtext_lengths)
         ab = self.ab(a, b)
         # c = b + ab
         c = ab
