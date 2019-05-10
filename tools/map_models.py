@@ -13,7 +13,7 @@ parser.add_argument("--mapping", type=str, required=True)
 parser.add_argument("--output", type=str, required=True)
 parser.add_argument("--gendisc", type=str, required=True)
 
-args = parser.parse()
+args = parser.parse_args()
 
 if args.gendisc.lower() == "g" :
     g = Generator(50)

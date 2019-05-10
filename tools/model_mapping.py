@@ -9,8 +9,8 @@ class ParseMapping :
         self.our_model = our_model
     
     def parse(self) :
-        
-        their_model = torch.load(self.their_model_file)
+        device = "cpu" if torch.cuda.is_available() is False else "cuda"
+        their_model = torch.load(self.their_model_file, map_location=device)
 
         # Read mapping
         with open(self.mapping_file, "r") as f :
@@ -35,7 +35,7 @@ class ParseMapping :
         mapped_parameters = OrderedDict()
 
         n = 0
-        for layer in our_model.keys() :
+        for layer in self.our_model.keys() :
             if layer not in our_to_their :
                 print("Layer {} not in our model".format(layer))
                 # mapped_parameters[layer] = our_model[layer]
