@@ -201,16 +201,11 @@ class Discriminator(nn.Module):
             nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(128, 256, 4, 2, padding=1, bias=False),
             nn.BatchNorm2d(256),
-            nn.LeakyReLU(0.2, inplace=True),
-            # Added to comply author's parameters
-            nn.Conv2d(256, 512, 4, 2, padding=1, bias=False),
-            nn.BatchNorm2d(512),
             nn.LeakyReLU(0.2, inplace=True)
         )
 
         self.conv4 = nn.Sequential(
-            # nn.Conv2d(256, 512, 4, 2, padding=1, bias=False),
-            nn.Conv2d(512, 512, 4, 2, padding=1, bias=False),
+            nn.Conv2d(256, 512, 4, 2, padding=1, bias=False),
             nn.BatchNorm2d(512),
             nn.LeakyReLU(0.2, inplace=True)
         )
@@ -224,8 +219,6 @@ class Discriminator(nn.Module):
 
         # UNCONDITIONAL DISCRIMINATOR
         self.un_disc = nn.Sequential(
-            nn.Conv2d(512, 1, 4, padding=0, stride=1),
-            nn.Conv2d(512, 1, 4, padding=0, stride=1),
             nn.Conv2d(512, 1, 4, padding=0, stride=1),
             nn.Softmax()  # TODO: do we use this?
         )
@@ -245,8 +238,8 @@ class Discriminator(nn.Module):
 
         #
         self.GAP1 = nn.Sequential(
-            nn.Conv2d(512, 512, 3, padding=1, bias=False),
-            nn.BatchNorm2d(512),
+            nn.Conv2d(256, 256, 3, padding=1, bias=False),
+            nn.BatchNorm2d(256),
             nn.LeakyReLU(0.2, inplace=True)
         )
 
@@ -313,7 +306,7 @@ class Discriminator(nn.Module):
             # else:
             #     Wb = self.get_Wb2(words_embs)
 
-            Wb = self.Wb[j]
+            Wb = self.Wb[j](words_embs)
 
             W = Wb[:, :, :-1]
             b = Wb[:, :, -1].unsqueeze(-1)
