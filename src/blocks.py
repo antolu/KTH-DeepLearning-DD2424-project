@@ -265,8 +265,8 @@ class Discriminator(nn.Module):
 
         #
         self.GAP1 = nn.Sequential(
-            nn.Conv2d(256, 256, 3, padding=1, bias=False),
-            nn.BatchNorm2d(256),
+            nn.Conv2d(512, 512, 3, padding=1, bias=False),
+            nn.BatchNorm2d(512),
             nn.LeakyReLU(0.2, inplace=True)
         )
 
