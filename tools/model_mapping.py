@@ -3,15 +3,14 @@ from collections import OrderedDict
 # from src.blocks import *
 
 class ParseMapping :
-    def __init__(self, mapping_file, their_model_file=None, our_model_file=None) :
+    def __init__(self, mapping_file, their_model_file=None, our_model=None) :
         self.mapping_file = mapping_file
         self.their_model_file = their_model_file
-        self.our_model_file = our_model_file
+        self.our_model = our_model
     
     def parse(self) :
         
         their_model = torch.load(self.their_model_file)
-        our_model = torch.load(self.our_model_file)
 
         # Read mapping
         with open(self.mapping_file, "r") as f :
