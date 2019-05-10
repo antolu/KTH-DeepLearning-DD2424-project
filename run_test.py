@@ -35,9 +35,9 @@ pc.load_fasttext()
 
 # Initialise transform
 tf = transforms.Compose([
-    transforms.RandomRotation((-10, 10)),
     transforms.Resize(136),
     transforms.RandomCrop(128),
+    transforms.RandomRotation((-10, 10)),
     transforms.RandomHorizontalFlip(),
     transforms.ToTensor()
 ])
@@ -51,16 +51,19 @@ train_set, val_set, test_set = pd.get_datasets()
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print("Using device {}.".format(device))
 
-# Load pretrained model
-if args.pretrained_model is not None :
-    pretrained_model = torch.load(args.pretrained_model)
 
 print("Loading pretrained model")
 generator = Generator(args.max_no_words, device).to(device)
 discriminator = Discriminator(args.max_no_words, device).to(device)
 
-if pretrained_model is not None :
-    generator.load_state_dict(pretrained_model, strict=False)
+# Load pretrained models
+if args.pretrained_generator is not None :
+    pretrained_generator = torch.load(args.pretrained_generator)
+    generator.load_state_dict(pretrained_generator, strict=False)
+if args.pretrained_discriminator is not None :
+    pretrained_discriminator = torch.load(args.pretrained_discriminator)
+    discriminator.load_state_dict(pretrained_discriminator, strict=False)
+
 
 if args.runtype == "train" :
     generator.train()
