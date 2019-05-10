@@ -216,7 +216,7 @@ class Discriminator(nn.Module):
 
         # IMAGE ENCODER
         self.conv3 = nn.Sequential(
-            nn.Conv2d(3, 64, 4, 2, padding=1, bias=False),
+            nn.Conv2d(3, 64, 4, 2, padding=1),
             nn.LeakyReLU(0.2, inplace=True), # I'm including this 'inplace' part since the example I am following has used it
             nn.Conv2d(64, 128, 4, 2, padding=1, bias=False),
             nn.BatchNorm2d(128),
