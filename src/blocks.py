@@ -225,6 +225,8 @@ class Discriminator(nn.Module):
         # UNCONDITIONAL DISCRIMINATOR
         self.un_disc = nn.Sequential(
             nn.Conv2d(512, 1, 4, padding=0, stride=1),
+            nn.Conv2d(512, 1, 4, padding=0, stride=1),
+            nn.Conv2d(512, 1, 4, padding=0, stride=1),
             nn.Softmax()  # TODO: do we use this?
         )
 
@@ -263,8 +265,12 @@ class Discriminator(nn.Module):
 
         # CONDITIONAL DISCRIMINATOR contained in forward pass
 
-        self.get_Wb1 = nn.Linear(512, 257)
-        self.get_Wb2 = nn.Linear(512, 513)
+        # self.get_Wb1 = nn.Linear(512, 257)
+        # self.get_Wb2 = nn.Linear(512, 513)
+        self.Wb1 = nn.Linear(512, 513)
+        self.Wb2 = nn.Linear(512, 513)
+        self.Wb3 = nn.Linear(512, 513)
+        self.Wb = [self.Wb1, self.Wb2, self.Wb3]
 
         self.apply(initialize_parameters)
 
@@ -302,10 +308,12 @@ class Discriminator(nn.Module):
             image = GAP_images[j]
             image = image.mean(-1).mean(-1).unsqueeze(-1)
 
-            if j == 0:
-                Wb = self.get_Wb1(words_embs)
-            else:
-                Wb = self.get_Wb2(words_embs)
+            # if j == 0:
+            #     Wb = self.get_Wb1(words_embs)
+            # else:
+            #     Wb = self.get_Wb2(words_embs)
+
+            Wb = self.Wb[j]
 
             W = Wb[:, :, :-1]
             b = Wb[:, :, -1].unsqueeze(-1)
