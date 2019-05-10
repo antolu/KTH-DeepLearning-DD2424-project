@@ -19,4 +19,8 @@ def parse_args() :
 
     parser.add_argument("--max_no_words", type=int, required=True, help="Maximum number of words for the model")
 
+    parser.add_argument("--runtype", type=str, required=True, help="Run train or test")
+    parser.add_argument("--no_epochs", type=int, required=False, help="Number of training epochs to run")
+
+
     return parser.parse_args()

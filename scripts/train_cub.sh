@@ -6,4 +6,5 @@ python run_test.py --images_root $CUB_IMAGES_ROOT \
                     --fasttext_model $FASTTEXT_EMBEDDING \
                     --pretrained_model $PRETRAINED_CUB_G \
                     --max_no_words $MAX_NO_WORDS  \
-                    --runtype test
+                    --runtype train \
+                    --no_epochs 10

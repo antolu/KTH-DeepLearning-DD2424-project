@@ -415,12 +415,12 @@ class Dataset(data.Dataset, ParseDatasets) :
         else :
             img = data["img"]
 
-        tnsr_img = self.transform(img).unsqueeze(0)
+        tnsr_img = self.transform(img)
 
         rand_caption = captions[np.random.choice(len(captions))]
 
         caption_vector, no_words = self.pc.string_to_vector(rand_caption, self.max_no_words)
 
-        ret = {"img":img, "tensor":tnsr_img, "caption_vector":caption_vector, "no_words":no_words, "caption":rand_caption}
+        # ret = {"img":img, "tensor":tnsr_img, "caption_vector":caption_vector, "no_words":no_words, "caption":rand_caption}
 
-        return ret
+        return tnsr_img, caption_vector, no_words, rand_caption, img
