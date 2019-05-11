@@ -15,7 +15,8 @@ def parse_args() :
     parser.add_argument("--keywords-file", type=str, required=False, help="Path to the keywords file required by COCO dataset filtering")
 
     parser.add_argument("--fasttext_model", type=str, required=True, help="The path to the fasttext word embedding")
-    parser.add_argument("--pretrained_model", type=str, required=True, help="The path to the pretrained generator model")
+    parser.add_argument("--pretrained_generator", type=str, required=False, help="The path to the pretrained generator model")
+    parser.add_argument("--pretrained_discriminator", type=str, required=False, help="The path to the pretrained generator model")
 
     parser.add_argument("--max_no_words", type=int, required=True, help="Maximum number of words for the model")
 

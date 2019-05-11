@@ -2,7 +2,10 @@
 # Maps the pretrained parameters to our structure and saves it
 ################################################################
 
-from tools.model_mapping import ParseMapping
+import sys
+sys.path.append("src")
+sys.path.append("tools")
+from model_mapping import ParseMapping
 from blocks import Generator, Discriminator
 import argparse
 
@@ -13,13 +16,13 @@ parser.add_argument("--mapping", type=str, required=True)
 parser.add_argument("--output", type=str, required=True)
 parser.add_argument("--gendisc", type=str, required=True)
 
-args = parser.parse()
+args = parser.parse_args()
 
 if args.gendisc.lower() == "g" :
     g = Generator(50)
     our_model = g.state_dict()
 elif args.gendisc.lower() == "d" :
-    d = Discriminator()
+    d = Discriminator(50)
     our_model = d.state_dict()
 
 pm = ParseMapping(args.mapping, their_model_file=args.pretrained, our_model=our_model)

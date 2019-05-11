@@ -1,0 +1,94 @@
+# Our implementation || Theirs
+# Maps our network to the one of the authors, to be able to
+# Load their model weights into our network as a pretrained network
+
+# Image encoder
+conv3.0.weight                      encoder_1.0.weight
+conv3.0.bias                        encoder_1.0.bias
+conv3.2.weight                      encoder_1.2.weight
+conv3.3.weight                      encoder_1.3.weight
+conv3.3.bias                        encoder_1.3.bias
+conv3.3.running_mean                encoder_1.3.running_mean
+conv3.3.running_var                 encoder_1.3.running_var
+conv3.3.num_batches_tracked         None
+
+conv3.5.weight                      encoder_1.5.weight
+conv3.6.weight                      encoder_1.6.weight
+conv3.6.bias                        encoder_1.6.bias
+conv3.6.running_mean                encoder_1.6.running_mean
+conv3.6.running_var                 encoder_1.6.running_var
+conv3.6.num_batches_tracked         None
+
+conv3.8.weight                      encoder_1.8.weight
+conv3.9.weight                      encoder_1.9.weight
+conv3.9.bias                        encoder_1.9.bias
+conv3.9.running_mean                encoder_1.9.running_mean
+conv3.9.running_var                 encoder_1.9.running_var
+conv3.9.num_batches_tracked         None
+
+conv4.0.weight                  encoder_2.0.weight
+conv4.1.weight                  encoder_2.1.weight
+conv4.1.bias                    encoder_2.1.bias
+conv4.1.running_mean            encoder_2.1.running_mean
+conv4.1.running_var             encoder_2.1.running_var
+conv4.1.num_batches_tracked     None
+conv5.0.weight                  encoder_3.0.weight
+conv5.1.weight                  encoder_3.1.weight
+conv5.1.bias                    encoder_3.1.bias
+conv5.1.running_mean            encoder_3.1.running_mean
+conv5.1.running_var             encoder_3.1.running_var
+conv5.1.num_batches_tracked     None
+
+# Text encoder
+gru_f.weight_ih         txt_encoder_f.weight_ih
+gru_f.weight_hh         txt_encoder_f.weight_hh
+gru_f.bias_ih           txt_encoder_f.bias_ih
+gru_f.bias_hh           txt_encoder_f.bias_hh
+gru_b.weight_ih         txt_encoder_b.weight_ih
+gru_b.weight_hh         txt_encoder_b.bias_ih
+gru_b.bias_ih           txt_encoder_b.bias_ih
+gru_b.bias_hh           txt_encoder_b.bias_hh
+
+# conv-layers
+
+# Ours
+GAP1.0.weight                   GAP_1.0.weight
+GAP1.1.weight                   GAP_1.1.weight
+GAP1.1.bias                     GAP_1.1.bias
+GAP1.1.running_mean             GAP_1.1.running_mean
+GAP1.1.running_var              GAP_1.1.running_var
+GAP1.1.num_batches_tracked      None
+
+GAP2.0.weight                   GAP_2.0.weight
+GAP2.1.weight                   GAP_2.1.weight
+GAP2.1.bias                     GAP_2.1.bias
+GAP2.1.running_mean             GAP_2.1.running_mean
+GAP2.1.running_var              GAP_2.1.running_var
+GAP2.1.num_batches_tracked      None
+
+GAP3.0.weight                   GAP_3.0.weight
+GAP3.1.weight                   GAP_3.1.weight
+GAP3.1.bias                     GAP_3.1.bias
+GAP3.1.running_mean             GAP_3.1.running_mean
+GAP3.1.running_var              GAP_3.1.running_var
+GAP3.1.num_batches_tracked      None
+
+# Conditional / unconditional discriminator
+
+# Ours
+un_disc.0.weight                    classifier_1.weight
+un_disc.0.bias                      classifier_1.bias
+un_disc.1.weight                    classifier_2.weight
+un_disc.1.bias                      classifier_2.bias
+un_disc.2.weight                    classifier_3.weight
+un_disc.2.bias                      classifier_3.bias
+
+get_betas.0.weight                  gen_weight.0.weight
+get_betas.0.bias                    gen_weight.0.bias
+
+Wb1.weight                          gen_filter.0.weight	
+Wb1.bias                            gen_filter.0.bias
+Wb2.weight                          gen_filter.1.weight	
+Wb2.bias                            gen_filter.1.bias
+Wb3.weight                          gen_filter.2.weight	
+Wb3.bias                            gen_filter.2.bias

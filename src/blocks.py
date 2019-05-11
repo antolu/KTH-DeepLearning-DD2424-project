@@ -7,6 +7,28 @@ import torch.nn.functional as F
 import numpy as np
 
 
+class Generator(nn.Module):
+    def __init__(self, num_words, device="cpu"):
+        super().__init__()
+        self.device = device
+        self.a = TextEncoderGenerator(num_words, device)
+        self.b = ImageEncoderGenerator()
+        self.ab = ConcatABResidualBlocks()
+
+        self.d = Decoder()
+        self.apply(initialize_parameters)
+
+    def forward(self, ximage, xtext, xtext_lengths):
+        # x includes both the text and the image
+        a, mu, sigma = self.a(xtext, xtext_lengths)
+        b = self.b(ximage)
+        ab = self.ab(a, b)
+        # c = b + ab
+        c = ab
+        d = self.d(b + c)
+        return d, mu, sigma
+
+
 class ConditioningAugmentation(nn.Module):
     def __init__(self, device="cpu"):
         super().__init__()
@@ -59,28 +81,6 @@ class TextEncoderGenerator(nn.Module):
         log_sigma = self.sigma_cond_aug(avg)
         final = self.cond_aug(mu, torch.exp(log_sigma))
         return final, mu, torch.exp(log_sigma)
-
-
-class ImageEncoderDiscriminator(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.main = nn.Sequential(OrderedDict([
-            ('conv1', nn.Conv2d(3, 64, 4, 1, 2)),
-
-            ('conv2', nn.Conv2d(64, 128, 4, 1, 2)),
-            ('act2', nn.LeakyReLU(0.2)),
-
-            ('conv3', nn.Conv2d(128, 256, 4, 1, 2)),
-            ('act3', nn.LeakyReLU(0.2)),
-
-            ('conv4', nn.Conv2d(256, 512, 4, 1, 2)),
-            ('act4', nn.LeakyReLU(0.2)),
-
-            ('conv5', nn.Conv2d(512, 512, 4, 1, 2)),
-            ('act5', nn.LeakyReLU(0.2))]))
-
-    def forward(self, im):
-        return self.main(im)
 
 
 class ImageEncoderGenerator(nn.Module):
@@ -187,28 +187,6 @@ class Decoder(nn.Module):
         return self.main(x)
 
 
-class Generator(nn.Module):
-    def __init__(self, num_words, device="cpu"):
-        super().__init__()
-        self.device = device
-        self.a = TextEncoderGenerator(num_words, device)
-        self.b = ImageEncoderGenerator()
-        self.ab = ConcatABResidualBlocks()
-
-        self.d = Decoder()
-        self.apply(initialize_parameters)
-
-    def forward(self, ximage, xtext, xtext_lengths):
-        # x includes both the text and the image
-        a, mu, sigma = self.a(xtext, xtext_lengths)
-        b = self.b(ximage)
-        ab = self.ab(a, b)
-        # c = b + ab
-        c = ab
-        d = self.d(b + c)
-        return d, mu, sigma
-
-
 class Discriminator(nn.Module):
     def __init__(self, num_words, device="cpu"):
         super().__init__()
@@ -216,7 +194,7 @@ class Discriminator(nn.Module):
 
         # IMAGE ENCODER
         self.conv3 = nn.Sequential(
-            nn.Conv2d(3, 64, 4, 2, padding=1, bias=False),
+            nn.Conv2d(3, 64, 4, 2, padding=1),
             nn.LeakyReLU(0.2, inplace=True), # I'm including this 'inplace' part since the example I am following has used it
             nn.Conv2d(64, 128, 4, 2, padding=1, bias=False),
             nn.BatchNorm2d(128),
@@ -280,8 +258,12 @@ class Discriminator(nn.Module):
 
         # CONDITIONAL DISCRIMINATOR contained in forward pass
 
-        self.get_Wb1 = nn.Linear(512, 257)
-        self.get_Wb2 = nn.Linear(512, 513)
+        # self.get_Wb1 = nn.Linear(512, 257)
+        # self.get_Wb2 = nn.Linear(512, 513)
+        self.Wb1 = nn.Linear(512, 513)
+        self.Wb2 = nn.Linear(512, 513)
+        self.Wb3 = nn.Linear(512, 513)
+        self.Wb = [self.Wb1, self.Wb2, self.Wb3]
 
         self.apply(initialize_parameters)
 
@@ -319,10 +301,12 @@ class Discriminator(nn.Module):
             image = GAP_images[j]
             image = image.mean(-1).mean(-1).unsqueeze(-1)
 
-            if j == 0:
-                Wb = self.get_Wb1(words_embs)
-            else:
-                Wb = self.get_Wb2(words_embs)
+            # if j == 0:
+            #     Wb = self.get_Wb1(words_embs)
+            # else:
+            #     Wb = self.get_Wb2(words_embs)
+
+            Wb = self.Wb[j](words_embs)
 
             W = Wb[:, :, :-1]
             b = Wb[:, :, -1].unsqueeze(-1)
