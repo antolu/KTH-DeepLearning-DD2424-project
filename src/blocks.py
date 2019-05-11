@@ -220,14 +220,14 @@ class Discriminator(nn.Module):
         # UNCONDITIONAL DISCRIMINATOR
         self.un_disc = nn.Sequential(
             nn.Conv2d(512, 1, 4, padding=0, stride=1),
-            nn.Softmax()  # TODO: do we use this?
+            nn.Softmax(dim=1)  # TODO: do we use this?
         )
 
 
         # TEXT ENCODER
         self.get_betas = nn.Sequential(
             nn.Linear(512, 3),
-            nn.Softmax()
+            nn.Softmax(dim=1)
         )
 
         self.gru_f = nn.GRUCell(input_size=300, hidden_size=512)
@@ -260,7 +260,7 @@ class Discriminator(nn.Module):
 
         # self.get_Wb1 = nn.Linear(512, 257)
         # self.get_Wb2 = nn.Linear(512, 513)
-        self.Wb1 = nn.Linear(512, 513)
+        self.Wb1 = nn.Linear(512, 257)
         self.Wb2 = nn.Linear(512, 513)
         self.Wb3 = nn.Linear(512, 513)
         self.Wb = [self.Wb1, self.Wb2, self.Wb3]
@@ -286,7 +286,7 @@ class Discriminator(nn.Module):
 
         # Calculate attentions
         u_dot_wi = torch.bmm(words_embs, avg).squeeze(-1)
-        alphas = F.softmax(u_dot_wi).permute(0, 1)
+        alphas = F.softmax(u_dot_wi, dim=1).permute(0, 1)
 
         # Get weights
         betas = self.get_betas(words_embs)

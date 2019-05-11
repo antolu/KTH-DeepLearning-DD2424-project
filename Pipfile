@@ -11,6 +11,9 @@ pytest = "*"
 cython = "*"
 pycocotools = "*"
 matplotlib = "*"
+torchfile = "*"
+pillow = "*"
+torchvision = "*"
 
 [dev-packages]
 

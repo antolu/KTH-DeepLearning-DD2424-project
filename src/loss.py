@@ -4,8 +4,9 @@ from torch.nn.functional import l1_loss
 
 def loss_generator(image, text, text_length, D, G, lambda_1, lambda_2):
     inds = torch.arange(text.size(0))
-    inds = torch.cat(inds[1:], inds[0])
+    inds = torch.cat((inds[1:], inds[0].unsqueeze(0)))
     negative_text = text[inds]
+    text_length = text_length.squeeze()
     negative_text_length = text_length[inds]
     t1 = torch.log(D(image))
     gen, _, _ = G(image, negative_text, negative_text_length)
@@ -23,6 +24,7 @@ def loss_discriminator(image, text, text_length, D, G, lambda_1):
     inds = torch.arange(text.size(0))
     inds = torch.cat((inds[1:], inds[0].unsqueeze(0)))
     negative_text = text[inds]
+    text_length = text_length.squeeze()
     negative_text_length = text_length[inds]
     tt1 = torch.log(D(image))
     tt2 = torch.log(D(image, text, text_length))
