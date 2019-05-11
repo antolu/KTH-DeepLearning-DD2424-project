@@ -26,7 +26,7 @@ def loss_discriminator(image, text, text_length, D, G, lambda_1):
     negative_text = text[inds]
     text_length = text_length.squeeze()
     negative_text_length = text_length[inds]
-    cond, uncond = D(image, text, text_length)
+    cond, uncond = D(image, text, text_length, return_unconditional=True)
     tt1 = torch.log(uncond)
     tt2 = torch.log(cond)
     tt3 = torch.log(1.0 - D(image, negative_text, negative_text_length, negative=True))

@@ -267,7 +267,7 @@ class Discriminator(nn.Module):
 
         self.apply(initialize_parameters)
 
-    def forward(self, image, text=None, len_text=None, negative=False):
+    def forward(self, image, text=None, len_text=None, negative=False, return_unconditional=False):
 
         image1 = self.conv3(image)
         image2 = self.conv4(image1)
@@ -326,7 +326,11 @@ class Discriminator(nn.Module):
         total = (alphas*torch.log(total)).sum(1)  # total should be (batch_size)
 
         if negative:
+            if return_unconditional:
+                return torch.exp(total_neg), d
             return torch.exp(total_neg)
+        if return_unconditional:
+            return torch.exp(total), d
         return torch.exp(total)
 
 
