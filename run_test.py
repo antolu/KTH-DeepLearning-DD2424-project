@@ -1,4 +1,3 @@
-
 import matplotlib
 import sys
 sys.path.append("src")
@@ -9,6 +8,8 @@ matplotlib.use('tkagg')
 import matplotlib.pyplot as plt
 
 import numpy as np
+from tqdm import trange
+from math import ceil
 from src.argparser import parse_args
 from src.blocks import Generator
 from src.image_io import *
@@ -74,25 +75,34 @@ if args.runtype == "train" :
 
     dataloader = DataLoader(train_set, batch_size=64, num_workers=4, shuffle=True)
 
-    for epoch in range(args.no_epochs) :
-        print("Starting epoch {}.".format(epoch+1))
-        for i_batch, (img, caption, no_words) in enumerate(dataloader):
-            print(i_batch)
-            # Do training
+    lg = ld = -1
+    try:
+        with trange(args.no_epochs) as t:
+            for epoch in t: 
+                for i_batch, (img, caption, no_words) in enumerate(dataloader):
+                    t.set_description('Epoch: {} | Batch: {}/{} | LG: {} | LD: {}'.format(epoch, i_batch + 1, ceil(len(train_set)/64), lg, ld))
+                    # Do training
 
-            img, caption, no_words = img.to(device), caption.to(device), no_words.to(device)
+                    img, caption, no_words = img.to(device), caption.to(device), no_words.to(device)
 
-            discriminator.zero_grad()
-            ld = loss_discriminator(img, caption, no_words, discriminator, generator, 10.0)
-            ld.backward()
-            od.step()
+                    discriminator.zero_grad()
+                    ld = loss_discriminator(img, caption, no_words, discriminator, generator, 10.0)
+                    ld.backward()
+                    od.step()
 
-            generator.zero_grad()
-            lg = loss_generator(img, caption, no_words, discriminator, generator, 10.0, 2.0)
-            lg.backward()
-            og.step()
-
-
+                    generator.zero_grad()
+                    lg = loss_generator(img, caption, no_words, discriminator, generator, 10.0, 2.0)
+                    lg.backward()
+                    og.step()
+                if epoch % 50 == 0:
+                    torch.save(generator.state_dict(), "./models/run_G_dataset_{}_epoch_{}.pth".format(args.dataset, epoch))
+                    torch.save(discriminator.state_dict(), "./models/run_D_dataset_{}_epoch_{}.pth".format(args.dataset, epoch))
+    except KeyboardInterrupt:
+        pass
+    finally:
+        torch.save(generator.state_dict(), "./models/run_G_dataset_{}_before_dying.pth".format(args.dataset))
+        torch.save(discriminator.state_dict(), "./models/run_D_dataset_{}_before_dying.pth".format(args.dataset))
+   
 elif args.runtype == 'test' :
 
     # How to call generator
