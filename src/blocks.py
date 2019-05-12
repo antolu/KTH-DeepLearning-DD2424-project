@@ -80,7 +80,7 @@ class TextEncoderGenerator(nn.Module):
         mu = self.mu_cond_aug(avg)
         log_sigma = self.sigma_cond_aug(avg)
         final = self.cond_aug(mu, torch.exp(log_sigma))
-        return final, mu, torch.exp(log_sigma)
+        return final, mu, log_sigma
 
 
 class ImageEncoderGenerator(nn.Module):
@@ -220,14 +220,14 @@ class Discriminator(nn.Module):
         # UNCONDITIONAL DISCRIMINATOR
         self.un_disc = nn.Sequential(
             nn.Conv2d(512, 1, 4, padding=0, stride=1),
-            nn.Softmax(dim=1)  # TODO: do we use this?
+            #nn.Softmax(dim=1)  # Removing this because final dimensions is B x 1 x 1. Where do we softmax?
         )
 
 
         # TEXT ENCODER
         self.get_betas = nn.Sequential(
             nn.Linear(512, 3),
-            nn.Softmax(dim=1)
+            nn.Softmax(dim=2)
         )
 
         self.gru_f = nn.GRUCell(input_size=300, hidden_size=512)
@@ -267,7 +267,7 @@ class Discriminator(nn.Module):
 
         self.apply(initialize_parameters)
 
-    def forward(self, image, text=None, len_text=None, negative=False, return_unconditional=False):
+    def forward(self, image, text=None, len_text=None):
 
         image1 = self.conv3(image)
         image2 = self.conv4(image1)
@@ -277,7 +277,7 @@ class Discriminator(nn.Module):
         GAP_image3 = self.GAP3(image3)
         GAP_images = [GAP_image1, GAP_image2, GAP_image3]
         d = self.un_disc(GAP_image3).squeeze()
-        if (text is None):
+        if text is None:
             return d.squeeze()
 
         # Get word embedding
@@ -311,27 +311,22 @@ class Discriminator(nn.Module):
             W = Wb[:, :, :-1]
             b = Wb[:, :, -1].unsqueeze(-1)
 
-            if negative:
-                W_neg = W[idx_neg]
-                b_neg = b[idx_neg]
-                betas_neg = betas.permute(2,0,1)
-                f_neg = torch.sigmoid(torch.bmm(W_neg, image) + b_neg).squeeze(-1)
-                total_neg += f_neg * betas_neg[j][idx_neg]
+            W_neg = W[idx_neg]
+            b_neg = b[idx_neg]
+            betas_neg = betas.permute(2,0,1)
+            f_neg = torch.sigmoid(torch.bmm(W_neg, image) + b_neg).squeeze(-1)
+            total_neg += f_neg * betas_neg[j][idx_neg]
             f = torch.sigmoid(torch.bmm(W, image) + b).squeeze(-1)
             total += f * betas[:, :, j]
 
-        if negative:
-            alphas_neg = alphas[idx_neg, :]  # need to change this
-            total_neg = (alphas_neg*torch.log(total_neg)).sum(1)  # total_neg should be (batch_size)
+        alphas_neg = alphas[idx_neg, :]  # need to change this
+        total_neg = (alphas_neg*torch.log(total_neg)).sum(1)  # total_neg should be (batch_size)
         total = (alphas*torch.log(total)).sum(1)  # total should be (batch_size)
 
-        if negative:
-            if return_unconditional:
-                return torch.exp(total_neg), d
-            return torch.exp(total_neg)
-        if return_unconditional:
-            return torch.exp(total), d
-        return torch.exp(total)
+        unconditional = d
+        cond_positive = total
+        cond_negative = total_neg
+        return unconditional, cond_positive, cond_negative
 
 
 def initialize_parameters(model):
