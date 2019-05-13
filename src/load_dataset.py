@@ -16,7 +16,7 @@ class ParseDatasets :
     The resulting data dictionaries have the following structure
     self.train_data = {<filename1>:{"imgpath":<path>, "captionpath":<path>, "img":<img>, "captions":<list of captions>} ... more filenames}
     """
-    def __init__(self, images_root="", annotations_root="", dataset="cub", keywords_file="caption_keywords.txt", data_set="train", max_no_words=50, preprocess_caption=None, transform=None) :
+    def __init__(self, images_root="", annotations_root="", dataset="cub", keywords_file="caption_keywords.txt", data_set="train", max_no_words=50, preprocess_caption=None, transform=None, blacklist=None) :
         """
         Initialises this class for one dataset
         :param images_root The root directory of the images of this dataset
@@ -27,6 +27,7 @@ class ParseDatasets :
         self.annotations_root = annotations_root
         self.dataset = dataset
         self.data_set = data_set
+        self.blacklist = blacklist
 
         self.max_no_words = max_no_words
         self.preprocess_caption = preprocess_caption
@@ -134,6 +135,11 @@ class ParseDatasets :
         # Go through all image captions, if at least one of the captions of an image contains a keyword, save the image and all captions of that image
         for imgID in sortedImgs:
             good_caption_count = 0
+
+            # Check against blacklist
+            if self.blacklist is not None and os.path.split(sortedImgs[imgID]["imgpath"])[1] in self.blacklist :
+                continue 
+
             for caption in sortedImgs[imgID]['captions']:
                 if len(set(caption.split()).intersection(self.caption_keywords)) > 0:
                     good_caption_count += 1
@@ -293,6 +299,16 @@ class ParseDatasets :
                     val_data[filename]["captionpath"] = filepath
                 elif data_split[imgId] == "0":
                     test_data[filename]["captionpath"] = filepath
+        
+        if blacklist is not None :
+            for item in self.blacklist :
+                filename = os.path.splitext(filename)[0]
+                if filename in train_data :
+                    del train_data[filename]
+                elif filename in val_data :
+                    del val_data[filename]
+                elif filename in test_data :
+                    del test_data[filename]
 
         self.data_split = data_split
         self.imgId_to_filename = imgId_to_filename
