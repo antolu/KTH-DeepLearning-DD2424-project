@@ -8,6 +8,8 @@ from PIL import Image
 import torch.utils.data as data
 from torchvision import transforms
 
+GOOD_CAPTION_THRESHOLD = 3
+
 class ParseDatasets :
     """
     Class for reading and parsing CUB and oxford datasets
@@ -110,6 +112,12 @@ class ParseDatasets :
         filteredImgs = {}
         sortedImgs = {}
 
+        # self.category_count = {}
+        # self.cat_id_to_name = {}
+        # for cat in self.coco.dataset["categories"] :
+        #     self.category_count[cat["id"]] = 0
+        #     self.cat_id_to_name[cat["id"]] = cat["name"]
+
         # One image might have several captions, concatenate all captions of one image id to a single dict
         for img in anns:
             imgID = img['image_id']
@@ -125,11 +133,14 @@ class ParseDatasets :
 
         # Go through all image captions, if at least one of the captions of an image contains a keyword, save the image and all captions of that image
         for imgID in sortedImgs:
-
+            good_caption_count = 0
             for caption in sortedImgs[imgID]['captions']:
                 if len(set(caption.split()).intersection(self.caption_keywords)) > 0:
-                    filteredImgs[imgID] = sortedImgs[imgID]
-                    break
+                    good_caption_count += 1
+                    if good_caption_count >= GOOD_CAPTION_THRESHOLD :
+                        filteredImgs[imgID] = sortedImgs[imgID]
+                        # self.category_count[sortedImgs[imgID]["category"]] += 1
+                        break
 
         self.data_dict = filteredImgs
 
