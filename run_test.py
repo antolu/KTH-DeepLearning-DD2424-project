@@ -3,6 +3,7 @@ import sys
 sys.path.append("src")
 from blocks import Discriminator
 from loss import loss_discriminator, loss_generator
+from utils import Utils
 
 matplotlib.use('tkagg')
 import matplotlib.pyplot as plt
@@ -20,7 +21,7 @@ import torch, torch.optim as optim
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
-args = parse_args()
+args = Utils.parse_args()
 
 # Check arguments
 supported_datasets = ["cub", "oxford", "coco"]
@@ -43,9 +44,14 @@ tf = transforms.Compose([
     transforms.ToTensor()
 ])
 
+if args.blacklist is not None :
+    blacklist = Utils.read_blacklist(args.blacklist)
+else :
+    blacklist = None
+
 # Parse datasets
 print("Parsing datasets")
-pd = ParseDatasets(dataset=args.dataset, images_root=args.images_root, annotations_root=args.annotations_root, preprocess_caption=pc, transform=tf)
+pd = ParseDatasets(dataset=args.dataset, images_root=args.images_root, annotations_root=args.annotations_root, preprocess_caption=pc, transform=tf, blacklist=blacklist)
 
 train_set, val_set, test_set = pd.get_datasets()
 

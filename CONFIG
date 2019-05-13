@@ -16,4 +16,6 @@ export PRETRAINED_COCO_G=coco_G.pth
 export PRETRAINED_COCO_D=coco_D.pth
 
 export FASTTEXT_EMBEDDING=fasttext/wiki.en.bin
+export BLACKLIST=blacklist.txt
 export MAX_NO_WORDS=50
+export NO_EPOCHS=500
