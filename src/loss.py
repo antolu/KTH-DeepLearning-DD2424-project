@@ -31,7 +31,7 @@ def loss_discriminator(image, text, text_length, D, G, lambda_1):
     negative_text_length = text_length[inds]
     fake = G(image, negative_text, negative_text_length.squeeze())[0]
     inner = 1.0 - torch.exp(D(fake.detach()))
-    inner[inner <= 0] = 1e-6
+    # inner[inner <= 0] = 1e-6
     t2 = torch.mean(torch.log(inner))
     loss = t1 + t2
     return loss
