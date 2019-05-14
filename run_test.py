@@ -2,7 +2,6 @@ import matplotlib
 import sys
 sys.path.append("src")
 from blocks import Discriminator
-from loss import loss_discriminator, loss_generator
 from utils import Utils
 from loss import loss_real_discriminator, loss_synthetic_discriminator, loss_generator, loss_generator_reconstruction
 import visdom

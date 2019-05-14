@@ -10,10 +10,10 @@ export PRETRAINED_OXFORD_D=models/mapped_flowers_D.pth
 
 export COCO_SET=train
 export COCO_IMAGES_ROOT=datasets/coco/${COCO_SET}2017
-export COCO_ANNOTATIONS_ROOT=datasets/coco/annotations
+export COCO_CAPTIONS_ROOT=datasets/coco/annotations
 export COCO_KEYWORDS_FILE=caption_keywords.txt
-export PRETRAINED_COCO_G=coco_G.pth
-export PRETRAINED_COCO_D=coco_D.pth
+export PRETRAINED_COCO_G=models/mapped_birds_G.pth
+export PRETRAINED_COCO_D=models/mapped_birds_D.pth
 
 export FASTTEXT_EMBEDDING=fasttext/wiki.en.bin
 export BLACKLIST=blacklist.txt

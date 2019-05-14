@@ -159,19 +159,10 @@ class ParseDatasets :
         
 
     def __get_imagepath(self, image_id, dataset="train") :
-        if dataset=='train' :
-            dataType = 'train2017'
-        elif dataset=='val' :
-            dataType = 'val2017'
-        elif dataset=='test' :
-            dataType = 'test2017'
-        else:
-            raise "set option " + dataset + " was not recognized!"
-
         image_id = str(image_id)
         image_id = (12-len(image_id)) * "0" + image_id
 
-        image_path = '{}/{}/{}.jpg'.format(self.images_root, dataType, image_id)
+        image_path = '{}/{}.jpg'.format(self.images_root, image_id)
 
         return image_path
 
