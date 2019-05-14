@@ -1,37 +1,44 @@
 import torch
-from torch.nn.functional import l1_loss
+from torch.nn.functional import l1_loss, binary_cross_entropy_with_logits
 
 
 def loss_generator(image, text, text_length, D, G, lambda_1, lambda_2):
-    text_length = text_length.squeeze()
-    uncond, pos_cond, neg_cond = D(image, text, text_length)
-    t1 = uncond
-    inds = torch.roll(torch.arange(text.size(0)), 1).squeeze()
-    negative_text = text[inds]
-    negative_text_length = text_length[inds]
-    gen, _, _ = G(image, negative_text, negative_text_length)
-    t2 = neg_cond
-    gen, mu, log_sigma = G(image, text, text_length)
-    l_rec = l1_loss(image, gen)
-
-    log_Sigma = 2*log_sigma
-    kl = (-torch.sum(log_Sigma, dim=1) - log_sigma.size(1) + torch.sum(torch.exp(log_Sigma), dim=1) + torch.sum(mu**2, dim=1)) * 0.5
-
-    return torch.mean(t1) + lambda_1 * torch.mean(t2) + lambda_2 * l_rec + torch.sum(kl)
-
-
-def loss_discriminator(image, text, text_length, D, G, lambda_1):
-    uncond, cond, cond_n = D(image, text, text_length.squeeze())
-    tt1 = uncond
-    tt2 = cond
-    tt3 = torch.log(1.0 - torch.exp(cond_n))
-    t1 = torch.mean(tt1 + lambda_1 * (tt2 + tt3))
     inds = torch.roll(torch.arange(text_length.size(0)), 1)
     negative_text = text[inds]
-    negative_text_length = text_length[inds]
-    fake = G(image, negative_text, negative_text_length.squeeze())[0]
-    inner = 1.0 - torch.exp(D(fake.detach()))
-    # inner[inner <= 0] = 1e-6
-    t2 = torch.mean(torch.log(inner))
-    loss = t1 + t2
-    return loss
+    negative_text_length = text_length.squeeze()[inds]
+    fake, mu, log_sigma = G(image, negative_text, negative_text_length.squeeze())
+    uncond, cond, _ = D(fake, negative_text, negative_text_length)
+    l1 = binary_cross_entropy_with_logits(uncond, torch.ones_like(uncond))
+    l2 = binary_cross_entropy_with_logits(cond, torch.ones_like(cond))
+
+    log_Sigma = 2*log_sigma
+    kl = torch.mean(-log_sigma + (torch.exp(log_Sigma) + mu**2 - 1.0) * 0.5)
+
+    return 0.5 * kl + l1 + l2 * lambda_1, fake
+
+def loss_generator_reconstruction(image, text, text_length, D, G, lambda_1, lambda_2):
+    reconstruction, mu, log_sigma = G(image, text, text_length.squeeze())
+
+    l1 = l1_loss(reconstruction, image)
+
+    log_Sigma = 2*log_sigma
+    kl = torch.mean(-log_sigma + (torch.exp(log_Sigma) + mu**2 - 1.0) * 0.5)
+
+    return 0.5 * kl + l1 * lambda_2
+
+def loss_real_discriminator(image, text, text_length, D, G, lambda_1):
+    uncond, cond, cond_n = D(image, text, text_length.squeeze())
+    l1 = binary_cross_entropy_with_logits(uncond, torch.ones_like(uncond))
+    l2 = binary_cross_entropy_with_logits(cond, torch.ones_like(cond))
+    l3 = binary_cross_entropy_with_logits(cond_n, torch.zeros_like(cond_n))
+    return l1 + lambda_1 * (l2 + l3) * 0.5
+
+def loss_synthetic_discriminator(image, text, text_length, D, G, lambda_1):
+    inds = torch.roll(torch.arange(text_length.size(0)), 1)
+    negative_text = text[inds]
+    negative_text_length = text_length.squeeze()[inds]
+
+    fake, _, _ = G(image, negative_text, negative_text_length.squeeze())
+    uncond, _, _ = D(fake.detach(), negative_text, negative_text_length.squeeze())
+
+    return binary_cross_entropy_with_logits(uncond, torch.zeros_like(uncond))
