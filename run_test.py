@@ -2,8 +2,8 @@ import matplotlib
 import sys
 sys.path.append("src")
 from blocks import Discriminator
-from loss import loss_discriminator, loss_generator
-
+from loss import loss_real_discriminator, loss_synthetic_discriminator, loss_generator, loss_generator_reconstruction
+import visdom
 matplotlib.use('tkagg')
 import matplotlib.pyplot as plt
 
@@ -67,41 +67,68 @@ if args.pretrained_discriminator is not None :
 
 
 if args.runtype == "train" :
+    vis = visdom.Visdom()
     generator.train()
     discriminator.train()
 
-    od = optim.Adam(generator.parameters(), lr=0.0002, betas=(0.5, 0.999))
-    og = optim.Adam(discriminator.parameters(), lr=0.0002, betas=(0.5, 0.999))
+    od = optim.Adam(generator.parameters(), lr=0.0002/16, betas=(0.5, 0.999))
+    og = optim.Adam(discriminator.parameters(), lr=0.0002/16, betas=(0.5, 0.999))
 
     dataloader = DataLoader(train_set, batch_size=64, num_workers=4, shuffle=True)
 
-    lg = ld = -1
+    lg = lgr = lsd = lrd = -1
+    generator_losses = open("generator_losses.csv", 'w')
+    discriminator_losses = open("discriminator_losses.csv", 'w')
+    generator_losses.write("epoch,batch,loss")
+    discriminator_losses.write("epoch,batch,loss")
     try:
         with trange(args.no_epochs) as t:
             for epoch in t: 
                 for i_batch, (img, caption, no_words) in enumerate(dataloader):
-                    t.set_description('Epoch: {} | Batch: {}/{} | LG: {} | LD: {}'.format(epoch, i_batch + 1, ceil(len(train_set)/64), lg, ld))
+                    t.set_description('Epoch: {} | Batch: {}/{} | LG: {} | LD: {}'.format(epoch, i_batch + 1, ceil(len(train_set)/64), lg + lgr, lrd + lsd))
                     # Do training
 
                     img, caption, no_words = img.to(device), caption.to(device), no_words.to(device)
 
                     discriminator.zero_grad()
-                    ld = loss_discriminator(img, caption, no_words, discriminator, generator, 10.0)
-                    ld.backward()
+                    lrd = loss_real_discriminator(img, caption, no_words, discriminator, generator, 10.0)
+                    lrd.backward()
+                    lsd = loss_synthetic_discriminator(img, caption, no_words, discriminator, generator, 10.0)
+                    lsd.backward()
                     od.step()
 
                     generator.zero_grad()
-                    lg = loss_generator(img, caption, no_words, discriminator, generator, 10.0, 2.0)
+                    lg, fake = loss_generator(img, caption, no_words, discriminator, generator, 10.0, 2.0)
                     lg.backward()
+                    lgr = loss_generator_reconstruction(img, caption, no_words, discriminator, generator, 10.0, 2.0)
+                    lgr.backward()
+                    generator_losses.write("{},{},{}".format(epoch, i_batch + 1, lg.detach().cpu().numpy().squeeze() + lgr.detach().cpu().numpy().squeeze()))
+                    discriminator_losses.write("{},{},{}".format(epoch, i_batch + 1, lrd.detach().cpu().numpy().squeeze() + lsd.detach().cpu().numpy().squeeze()))
                     og.step()
-                if epoch % 50 == 0:
+                if (epoch + 1) % 50 == 0:
                     torch.save(generator.state_dict(), "./models/run_G_dataset_{}_epoch_{}.pth".format(args.dataset, epoch))
                     torch.save(discriminator.state_dict(), "./models/run_D_dataset_{}_epoch_{}.pth".format(args.dataset, epoch))
+                    torch.save(od.state_dict(), "./models/run_od_dataset_{}_epoch_{}.pth".format(args.dataset, epoch))
+                    torch.save(og.state_dict(), "./models/run_og_dataset_{}_epoch_{}.pth".format(args.dataset, epoch))
+                if ((epoch + 1) % 100) == 0:
+                    optimizers = [od, og]
+                    for o in optimizers:
+                        for param_group in o.param_groups:
+                            param_group['lr'] /= 2.0
+
+                img_vis = img.mul(0.5).add(0.5)
+                vis.images(img_vis.cpu().detach().numpy(), nrow=4, opts=dict(title='original'))
+                fake_vis = fake.mul(0.5).add(0.5)
+                vis.images(fake_vis.cpu().detach().numpy(), nrow=4, opts=dict(title='generated'))
     except KeyboardInterrupt:
         pass
     finally:
+        torch.save(od.state_dict(), "./models/run_od_dataset_{}_before_dying.pth".format(args.dataset))
+        torch.save(og.state_dict(), "./models/run_og_dataset_{}_before_dying.pth".format(args.dataset))
         torch.save(generator.state_dict(), "./models/run_G_dataset_{}_before_dying.pth".format(args.dataset))
         torch.save(discriminator.state_dict(), "./models/run_D_dataset_{}_before_dying.pth".format(args.dataset))
+        discriminator_losses.close()
+        generator_losses.close()
    
 elif args.runtype == 'test' :
 
