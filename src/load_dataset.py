@@ -300,7 +300,7 @@ class ParseDatasets :
                 elif data_split[imgId] == "0":
                     test_data[filename]["captionpath"] = filepath
         
-        if blacklist is not None :
+        if self.blacklist is not None :
             for item in self.blacklist :
                 filename = os.path.splitext(filename)[0]
                 if filename in train_data :
@@ -430,6 +430,12 @@ class Dataset(data.Dataset, ParseDatasets) :
         return len(self.data)
 
     def __getitem__(self, i) :
+
+        tnsr_img, caption_vector, no_words, rand_caption, img = self.get(i)
+
+        return tnsr_img, caption_vector, no_words
+
+    def get(self, i) :
         imgId = self.keys[i]
 
         data = self.data[imgId]
@@ -454,4 +460,4 @@ class Dataset(data.Dataset, ParseDatasets) :
 
         #print("\ni: {}\ntmgId: {}\nrand_caption: {}\ntensor_img_shape: {}\ncaption_vec_shape:{}\n".format(
         #    i, imgId, rand_caption, tnsr_img.shape, caption_vector.shape))
-        return tnsr_img, caption_vector, no_words
+        return tnsr_img, caption_vector, no_words, rand_caption, img

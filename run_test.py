@@ -11,7 +11,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import trange
 from math import ceil
-from src.argparser import parse_args
 from src.blocks import Generator
 from src.image_io import *
 from src.load_dataset import ParseDatasets, Dataset
@@ -117,7 +116,7 @@ elif args.runtype == 'test' :
 
     while True :
         i = np.random.choice(len(test_set))
-        tensor, caption_vec, no_words, caption, img = test_set[i]
+        tensor, caption_vec, no_words, caption, img = test_set.get(i)
 
         # print("Generating for sample with caption \"{}\"".format(sample["caption"]))
 
