@@ -63,34 +63,49 @@ generator = Generator(args.max_no_words, device).to(device)
 discriminator = Discriminator(args.max_no_words, device).to(device)
 
 # Load pretrained models
-if args.pretrained_generator is not None :
+if args.pretrained_generator is not None:
     pretrained_generator = torch.load(args.pretrained_generator)
     generator.load_state_dict(pretrained_generator, strict=False)
-if args.pretrained_discriminator is not None :
+if args.pretrained_discriminator is not None:
     pretrained_discriminator = torch.load(args.pretrained_discriminator)
     discriminator.load_state_dict(pretrained_discriminator, strict=False)
 
-
-if args.runtype == "train" :
+if args.runtype == "train":
     vis = visdom.Visdom()
     generator.train()
     discriminator.train()
 
-    od = optim.Adam(generator.parameters(), lr=0.0002/16, betas=(0.5, 0.999))
-    og = optim.Adam(discriminator.parameters(), lr=0.0002/16, betas=(0.5, 0.999))
+    od = optim.Adam(generator.parameters(),
+                    lr=0.0002/16,
+                    betas=(0.5, 0.999))
+    og = optim.Adam(discriminator.parameters(), lr=0.0002/16,
+                    betas=(0.5, 0.999))
 
-    dataloader = DataLoader(train_set, batch_size=64, num_workers=4, shuffle=True)
+    # Load pretrained optimizers
+    if args.pretrained_optimizer_discriminator is not None:
+        pretrained_optimizer_discriminator = torch.load(
+            args.pretrained_optimizer_discriminator)
+        od.load_state_dict(pretrained_optimizer_discriminator, strict=False)
+
+    if args.pretrained_optimizer_generator is not None:
+        pretrained_optimizer_generator = torch.load(
+            args.pretrained_optimizer_generator)
+        od.load_state_dict(pretrained_optimizer_generator, strict=False)
+
+    dataloader = DataLoader(train_set, batch_size=64, num_workers=4,
+                            shuffle=True)
 
     lg = lgr = lsd = lrd = -1
     generator_losses = open("generator_losses.csv", 'w')
     discriminator_losses = open("discriminator_losses.csv", 'w')
-    generator_losses.write("epoch,batch,loss")
-    discriminator_losses.write("epoch,batch,loss")
+    generator_losses.write("epoch,batch,loss\n")
+    discriminator_losses.write("epoch,batch,loss\n")
     try:
         with trange(args.no_epochs) as t:
             for epoch in t: 
                 for i_batch, (img, caption, no_words) in enumerate(dataloader):
-                    t.set_description('Epoch: {} | Batch: {}/{} | LG: {} | LD: {}'.format(epoch, i_batch + 1, ceil(len(train_set)/64), lg + lgr, lrd + lsd))
+                    t.set_description('Epoch: {} | Batch: {}/{} | LG: {} | LD: {}'.format(
+                        epoch, i_batch + 1, ceil(len(train_set)/64), lg + lgr, lrd + lsd))
                     # Do training
 
                     img, caption, no_words = img.to(device), caption.to(device), no_words.to(device)
@@ -107,8 +122,8 @@ if args.runtype == "train" :
                     lg.backward()
                     lgr = loss_generator_reconstruction(img, caption, no_words, discriminator, generator, 10.0, 2.0)
                     lgr.backward()
-                    generator_losses.write("{},{},{}".format(epoch, i_batch + 1, lg.detach().cpu().numpy().squeeze() + lgr.detach().cpu().numpy().squeeze()))
-                    discriminator_losses.write("{},{},{}".format(epoch, i_batch + 1, lrd.detach().cpu().numpy().squeeze() + lsd.detach().cpu().numpy().squeeze()))
+                    generator_losses.write("{},{},{}\n".format(epoch, i_batch + 1, lg.detach().cpu().numpy().squeeze() + lgr.detach().cpu().numpy().squeeze()))
+                    discriminator_losses.write("{},{},{}\n".format(epoch, i_batch + 1, lrd.detach().cpu().numpy().squeeze() + lsd.detach().cpu().numpy().squeeze()))
                     og.step()
                 if (epoch + 1) % 50 == 0:
                     torch.save(generator.state_dict(), "./models/run_G_dataset_{}_epoch_{}.pth".format(args.dataset, epoch))
@@ -135,7 +150,7 @@ if args.runtype == "train" :
         discriminator_losses.close()
         generator_losses.close()
    
-elif args.runtype == 'test' :
+elif args.runtype == 'test':
 
     # How to call generator
     print("Calling generator")
