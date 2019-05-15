@@ -85,12 +85,12 @@ if args.runtype == "train":
     if args.pretrained_optimizer_discriminator is not None:
         pretrained_optimizer_discriminator = torch.load(
             args.pretrained_optimizer_discriminator)
-        od.load_state_dict(pretrained_optimizer_discriminator, strict=False)
+        od.load_state_dict(pretrained_optimizer_discriminator)
 
     if args.pretrained_optimizer_generator is not None:
         pretrained_optimizer_generator = torch.load(
             args.pretrained_optimizer_generator)
-        od.load_state_dict(pretrained_optimizer_generator, strict=False)
+        od.load_state_dict(pretrained_optimizer_generator)
 
     dataloader = DataLoader(train_set, batch_size=64, num_workers=4,
                             shuffle=True)
