@@ -27,7 +27,10 @@ class Utils :
 
         parser.add_argument("--runtype", type=str, required=True, help="Run train or test")
         parser.add_argument("--no_epochs", type=int, required=False, help="Number of training epochs to run")
-
+        parser.add_argument("--pretrained_optimizer_discriminator",
+                            type=str, required=False, help="Load a pretrained optimizer for the discriminator with a certain learning rate and parameters")
+        parser.add_argument("--pretrained_optimizer_generator",
+                            type=str, required=False, help="Load a pretrained optimizer for the generator with a certain learning rate and parameters")
 
         return parser.parse_args()
 
