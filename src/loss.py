@@ -8,8 +8,8 @@ def loss_generator(image, text, text_length, D, G, lambda_1, lambda_2):
     negative_text_length = text_length.squeeze()[inds]
     fake, mu, log_sigma = G(image, negative_text, negative_text_length.squeeze())
     uncond, cond, _ = D(fake, negative_text, negative_text_length)
-    l1 = binary_cross_entropy_with_logits(uncond, torch.ones_like(uncond))
-    l2 = binary_cross_entropy_with_logits(cond, torch.ones_like(cond))
+    l1 = binary_cross_entropy_with_logits(uncond.detach(), torch.ones_like(uncond))
+    l2 = binary_cross_entropy_with_logits(cond.detach(), torch.ones_like(cond))
 
     log_Sigma = 2*log_sigma
     kl = torch.mean(-log_sigma + (torch.exp(log_Sigma) + mu**2 - 1.0) * 0.5)
