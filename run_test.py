@@ -144,13 +144,17 @@ if args.runtype == "train":
 
                     total_steps += 1
                     t.set_description('Epoch: {} | Batch: {}/{} | LG: {} | LD: {}'.format(
-                        epoch, i_batch + 1, ceil(len(train_set)/64), lg + lgr, lrd + lsd))
-                    
+                        epoch, i_batch + 1, ceil(len(train_set) / batch_size), lg + lgr, lrd + lsd))
+
                 if (epoch + 1) % 50 == 0:
-                    torch.save(generator.state_dict(), "./models/run_G_dataset_{}_epoch_{}.pth".format(args.dataset, epoch))
-                    torch.save(discriminator.state_dict(), "./models/run_D_dataset_{}_epoch_{}.pth".format(args.dataset, epoch))
-                    torch.save(od.state_dict(), "./models/run_od_dataset_{}_epoch_{}.pth".format(args.dataset, epoch))
-                    torch.save(og.state_dict(), "./models/run_og_dataset_{}_epoch_{}.pth".format(args.dataset, epoch))
+                    torch.save(generator.state_dict(), "./models/run_G_dataset_{}_epoch_{}.pth".format(
+                        args.dataset, epoch))
+                    torch.save(discriminator.state_dict(), "./models/run_D_dataset_{}_epoch_{}.pth".format(
+                        args.dataset, epoch))
+                    torch.save(od.state_dict(), "./models/run_od_dataset_{}_epoch_{}.pth".format(
+                        args.dataset, epoch))
+                    torch.save(og.state_dict(), "./models/run_og_dataset_{}_epoch_{}.pth".format(
+                        args.dataset, epoch))
                 img_vis = img.mul(0.5).add(0.5)
                 vis.images(img_vis.cpu().detach().numpy(), nrow=4, opts=dict(title='original'))
                 vis.text()
@@ -168,27 +172,29 @@ if args.runtype == "train":
         generator_losses.close()
 
 elif args.runtype == 'test':
-
     # How to call generator
     print("Calling generator")
     generator.eval()
 
-    while True :
+    while True:
         i = np.random.choice(len(test_set))
         tensor, caption_vec, no_words, caption, img = test_set.get(i)
 
         # print("Generating for sample with caption \"{}\"".format(sample["caption"]))
 
-        print("The original caption is \"{}\". Enter your modified caption. \nLeave blank for the original caption".format(caption))
+        print("""
+The original caption is \"{}\". Enter your modified caption.
+Leave blank for the original caption""".format(caption))
         cap = input()
-        if cap != "" :
+        if cap != "":
             caption_vec, no_words = pc.string_to_vector(cap, args.max_no_words)
 
         print("running")
-        generated, _, _ = generator(tensor.unsqueeze(0).to(device), caption_vec.unsqueeze(0).to(device), no_words.to(device))
+        generated, _, _ = generator(tensor.unsqueeze(0).to(device), caption_vec.unsqueeze(0).to(
+            device), no_words.to(device))
 
         disp_sidebyside([img, tensor.cpu().squeeze(), generated.cpu().squeeze()], caption=cap)
 
         prompt = input("Do you want to keep generating more images? (y/n) ")
-        if prompt != "y" :
+        if prompt != "y":
             break

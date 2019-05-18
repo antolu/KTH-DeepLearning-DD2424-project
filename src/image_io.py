@@ -39,3 +39,4 @@ def disp_sidebyside(images, caption=None) :
     plt.show(block=True)
     f.clear()
     plt.close(f)
+
