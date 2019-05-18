@@ -142,13 +142,8 @@ if args.runtype == "train":
                     discriminator_losses.write("{},{},{}\n".format(epoch, i_batch + 1, score))
                     og.step()
 
-                    if (total_steps + 1) % 20 == 0:
-                        print("Epoch: {}\tBatch: {}\tLG: {}\tLD: {}\tKLD: {}".format(
-                            epoch + 1, i_batch + 1, ceil(len(train_set) / args.batch_size), lg + lgr,
-                            lrd + lsd, kld
-                        ))
-                    # t.set_description('Epoch: {} | Batch: {}/{} | LG: {} | LD: {}'.format(
-                    #     epoch, i_batch + 1, ceil(len(train_set) / args.batch_size), lg + lgr, lrd + lsd))
+                    t.set_description('Epoch: {} | Batch: {}/{} | LG: {} | LD: {} | KLD: {}'.format(
+                        epoch, i_batch + 1, ceil(len(train_set) / args.batch_size), lg + lgr, lrd + lsd, kld))
 
                     total_steps += 1
 
