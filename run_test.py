@@ -7,7 +7,7 @@ from loss import loss_real_discriminator, loss_synthetic_discriminator, loss_gen
 import visdom
 matplotlib.use('tkagg')
 import matplotlib.pyplot as plt
-from torch.autograd import Variable
+
 import numpy as np
 from tqdm import trange
 from math import ceil
@@ -19,6 +19,8 @@ from src.preprocess_caption import PreprocessCaption
 import torch, torch.optim as optim
 from torch.utils.data import DataLoader
 from torchvision import transforms
+
+torch.manual_seed(0)
 
 args = Utils.parse_args()
 
@@ -76,9 +78,9 @@ if args.runtype == "train":
     discriminator.train()
 
     od = optim.Adam(generator.parameters(),
-                    lr=0.0002,
+                    lr=0.0002/16,
                     betas=(0.5, 0.999))
-    og = optim.Adam(discriminator.parameters(), lr=0.0002,
+    og = optim.Adam(discriminator.parameters(), lr=0.0002/16,
                     betas=(0.5, 0.999))
 
     # Load pretrained optimizers
@@ -95,19 +97,25 @@ if args.runtype == "train":
     dataloader = DataLoader(train_set, batch_size=64, num_workers=4,
                             shuffle=True)
 
-    lg = lgr = lsd = lrd = Variable(torch.ones(1) * -1)
+    lg = lgr = lsd = lrd = -1
     generator_losses = open("generator_losses.csv", 'w')
     discriminator_losses = open("discriminator_losses.csv", 'w')
     generator_losses.write("epoch,batch,loss\n")
     discriminator_losses.write("epoch,batch,loss\n")
+    total_steps = 0
     try:
         with trange(args.no_epochs) as t:
             for epoch in t:
-                fake = None
                 for i_batch, (img, caption, no_words) in enumerate(dataloader):
                     t.set_description('Epoch: {} | Batch: {}/{} | LG: {} | LD: {}'.format(
-                        epoch, i_batch + 1, ceil(len(train_set)/64), (lg + lgr).detach().cpu().numpy().squeeze(), lrd + lsd))
+                        epoch, i_batch + 1, ceil(len(train_set)/64), lg + lgr, lrd + lsd))
                     # Do training
+
+                    if ((total_steps + 1) % 100) == 0:
+                        optimizers = [od, og]
+                        for o in optimizers:
+                            for param_group in o.param_groups:
+                                param_group['lr'] /= 2.0
 
                     img, caption, no_words = img.to(device), caption.to(device), no_words.to(device)
 
@@ -118,33 +126,26 @@ if args.runtype == "train":
                     lsd.backward()
                     od.step()
 
-                    if (epoch + 1) % 10 == 0:
-                        generator.zero_grad()
-                        lg, fake = loss_generator(img, caption, no_words, discriminator, generator, 10.0, 0.2)
-                        lg.backward()
-                        lgr = loss_generator_reconstruction(img, caption, no_words, discriminator, generator, 10.0, 0.2)
-                        lgr.backward()
-                        og.step()
- 
-                        generator_losses.write("{},{},{}\n".format(epoch, i_batch + 1, lg.detach().cpu().numpy().squeeze() + lgr.detach().cpu().numpy().squeeze()))
-                    discriminator_losses.write("{},{},{}\n".format(epoch, i_batch + 1, lrd.detach().cpu().numpy().squeeze() + lsd.detach().cpu().numpy().squeeze())) 
+                    generator.zero_grad()
+                    lg, fake = loss_generator(img, caption, no_words, discriminator, generator, 10.0, 0.2)
+                    lg.backward()
+                    lgr = loss_generator_reconstruction(img, caption, no_words, discriminator, generator, 10.0, 0.2)
+                    lgr.backward()
+                    generator_losses.write("{},{},{}\n".format(epoch, i_batch + 1, lg.detach().cpu().numpy().squeeze() + lgr.detach().cpu().numpy().squeeze()))
+                    discriminator_losses.write("{},{},{}\n".format(epoch, i_batch + 1, lrd.detach().cpu().numpy().squeeze() + lsd.detach().cpu().numpy().squeeze()))
+                    og.step()
+
+                    total_steps += 1
                     
                 if (epoch + 1) % 50 == 0:
                     torch.save(generator.state_dict(), "./models/run_G_dataset_{}_epoch_{}.pth".format(args.dataset, epoch))
                     torch.save(discriminator.state_dict(), "./models/run_D_dataset_{}_epoch_{}.pth".format(args.dataset, epoch))
                     torch.save(od.state_dict(), "./models/run_od_dataset_{}_epoch_{}.pth".format(args.dataset, epoch))
                     torch.save(og.state_dict(), "./models/run_og_dataset_{}_epoch_{}.pth".format(args.dataset, epoch))
-                if ((epoch + 1) % 100) == 0:
-                    optimizers = [od, og]
-                    for o in optimizers:
-                        for param_group in o.param_groups:
-                            param_group['lr'] /= 2.0
-
-                if fake is not None:
-                    img_vis = img.mul(0.5).add(0.5)
-                    vis.images(img_vis.cpu().detach().numpy(), nrow=4, opts=dict(title='original'))
-                    fake_vis = fake.mul(0.5).add(0.5)
-                    vis.images(fake_vis.cpu().detach().numpy(), nrow=4, opts=dict(title='generated'))
+                img_vis = img.mul(0.5).add(0.5)
+                vis.images(img_vis.cpu().detach().numpy(), nrow=4, opts=dict(title='original'))
+                fake_vis = fake.mul(0.5).add(0.5)
+                vis.images(fake_vis.cpu().detach().numpy(), nrow=4, opts=dict(title='generated'))
     except KeyboardInterrupt:
         pass
     finally:
@@ -154,7 +155,7 @@ if args.runtype == "train":
         torch.save(discriminator.state_dict(), "./models/run_D_dataset_{}_before_dying.pth".format(args.dataset))
         discriminator_losses.close()
         generator_losses.close()
-        
+
 elif args.runtype == 'test':
 
     # How to call generator
@@ -162,8 +163,8 @@ elif args.runtype == 'test':
     generator.eval()
 
     while True :
-        i = np.random.choice(len(train_set))
-        tensor, caption_vec, no_words, caption, img = train_set.get(i)
+        i = np.random.choice(len(test_set))
+        tensor, caption_vec, no_words, caption, img = test_set.get(i)
 
         # print("Generating for sample with caption \"{}\"".format(sample["caption"]))
 
