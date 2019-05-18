@@ -14,7 +14,7 @@ def loss_generator(image, text, text_length, D, G, lambda_1, lambda_2):
     log_Sigma = 2 * log_sigma
     kl = torch.mean(-log_sigma + (torch.exp(log_Sigma) + mu**2 - 1.0) * 0.5)
 
-    return 0.5 * kl + l1 + l2 * lambda_1, fake
+    return 0.5 * kl + l1 + l2 * lambda_1, fake, negative_text
 
 
 def loss_generator_reconstruction(image, text, text_length, D, G, lambda_1, lambda_2):
