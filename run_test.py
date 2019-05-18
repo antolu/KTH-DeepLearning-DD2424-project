@@ -9,17 +9,18 @@ import torch.optim as optim
 import visdom
 import torch
 from blocks import Discriminator
+from blocks import Discriminator_authors
 from loss import loss_real_discriminator, loss_synthetic_discriminator
 from loss import loss_generator, loss_generator_reconstruction
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from tqdm import trange
 from utils import Utils
-
-from src.blocks import Generator
-from src.image_io import disp_sidebyside
-from src.load_dataset import ParseDatasets
-from src.preprocess_caption import PreprocessCaption
+from blocks import Generator
+from blocks import Generator_authors
+from image_io import disp_sidebyside
+from load_dataset import ParseDatasets
+from preprocess_caption import PreprocessCaption
 
 
 matplotlib.use('tkagg')
@@ -64,8 +65,10 @@ train_set, val_set, test_set = pd.get_datasets()
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print("Using device {}.".format(device))
 
-generator = Generator(args.max_no_words, device).to(device)
-discriminator = Discriminator(args.max_no_words, device).to(device)
+# generator = Generator(args.max_no_words, device).to(device)
+generator = Generator_authors().to(device)
+# discriminator = Discriminator(args.max_no_words, device).to(device)
+discriminator = Discriminator_authors().to(device)
 
 # Load pretrained models
 if args.pretrained_generator is not None:
@@ -131,6 +134,8 @@ if args.runtype == "train":
                     img = img.mul(2)
                     img = img.sub(1)
 
+                    caption = caption.permute(1, 0, 2)
+                    
                     discriminator.zero_grad()
                     no_words = no_words.squeeze()
                     lrd = loss_real_discriminator(img, caption, no_words, discriminator, generator, 10.0, params)
@@ -140,24 +145,23 @@ if args.runtype == "train":
                     score = lrd.detach().cpu().numpy().squeeze() + lsd.detach().cpu().numpy().squeeze()
                     od.step()
 
-                    if (i_batch + 1) % 10 == 0:
-                        generator.zero_grad()
-                        lgs, fake, negative_text = loss_generator(img, caption, no_words, discriminator, generator, 10.0, params)
-                        lgs.backward()
-                        lgr, kld = loss_generator_reconstruction(img, caption, no_words, discriminator, generator, 2.0, params)
-                        lgr.backward()
-                        score = lgs.detach().cpu().numpy().squeeze() + lgr.detach().cpu().numpy().squeeze()
+                    generator.zero_grad()
+                    lgs, fake, negative_text = loss_generator(img, caption, no_words, discriminator, generator, 10.0, params)
+                    lgs.backward()
+                    lgr, kld = loss_generator_reconstruction(img, caption, no_words, discriminator, generator, 2.0, params)
+                    lgr.backward()
+                    score = lgs.detach().cpu().numpy().squeeze() + lgr.detach().cpu().numpy().squeeze()
 
-                        og.step()
+                    og.step()
 
                     den = (i_batch + 1)
 
                     cond_disc_fake = params["cond_disc_fake"] / den
                     cond_disc_real = params["cond_disc_real"] / den
                     l1_reconstruction = params["l1_reconstruction"] / den
-                    kl = params["kl"] / den * 10
-                    cond_p_gen = params["cond_p_gen"] / den * 10
-                    uncond_gen = params["uncond_gen"] / den * 10
+                    kl = params["kl"] / den
+                    cond_p_gen = params["cond_p_gen"] / den
+                    uncond_gen = params["uncond_gen"] / den
                     uncond_disc_real = params["uncond_disc_real"] / den
 
                     print(
