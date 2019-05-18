@@ -133,7 +133,7 @@ if args.runtype == "train":
                     generator.zero_grad()
                     lg, fake = loss_generator(img, caption, no_words, discriminator, generator, 10.0, 0.2)
                     lg.backward()
-                    lgr = loss_generator_reconstruction(img, caption, no_words, discriminator, generator, 10.0, 0.2)
+                    lgr, kld = loss_generator_reconstruction(img, caption, no_words, discriminator, generator, 10.0, 0.2)
                     lgr.backward()
                     score = lg.detach().cpu().numpy().squeeze() + lgr.detach().cpu().numpy().squeeze()
                     generator_losses.write("{},{},{}\n".format(epoch, i_batch + 1, score))
@@ -141,9 +141,15 @@ if args.runtype == "train":
                     discriminator_losses.write("{},{},{}\n".format(epoch, i_batch + 1, score))
                     og.step()
 
+                    if (total_steps + 1) % 20:
+                        print("Epoch: {}\tBatch: {}\tLG: {}\tLD: {}\tKLD: {}".format(
+                            epoch + 1, i_batch + 1, ceil(len(train_set) / args.batch_size), lg + lgr,
+                            lrd + lsd, kld
+                        ))
+                    # t.set_description('Epoch: {} | Batch: {}/{} | LG: {} | LD: {}'.format(
+                    #     epoch, i_batch + 1, ceil(len(train_set) / args.batch_size), lg + lgr, lrd + lsd))
+
                     total_steps += 1
-                    t.set_description('Epoch: {} | Batch: {}/{} | LG: {} | LD: {}'.format(
-                        epoch, i_batch + 1, ceil(len(train_set) / args.batch_size), lg + lgr, lrd + lsd))
 
                 if (epoch + 1) % 50 == 0:
                     torch.save(generator.state_dict(), "./models/run_G_dataset_{}_epoch_{}.pth".format(
