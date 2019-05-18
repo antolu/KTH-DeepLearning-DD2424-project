@@ -118,6 +118,8 @@ if args.runtype == "train":
                                 param_group['lr'] /= 2.0
 
                     img, caption, no_words = img.to(device), caption.to(device), no_words.to(device)
+                    img = img.mul(2)
+                    img = img.sub(1)
 
                     discriminator.zero_grad()
                     lrd = loss_real_discriminator(img, caption, no_words, discriminator, generator, 10.0)

@@ -1,10 +1,10 @@
 # TAGAN implementation
 from collections import OrderedDict
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
 
 
 class Generator(nn.Module):
@@ -37,7 +37,8 @@ class ConditioningAugmentation(nn.Module):
     def forward(self, mu, sigma):
         res = torch.zeros_like(mu)
         for i in range(mu.size(0)):
-            res[i] = torch.randn(mu[i].shape).to(self.device) * sigma[i] + mu[i]
+            res[i] = torch.randn(
+                mu[i].shape).to(self.device) * sigma[i] + mu[i]
         return res
 
 
@@ -75,7 +76,8 @@ class TextEncoderGenerator(nn.Module):
         self.cond_aug = ConditioningAugmentation(device)
 
     def forward(self, text, text_lengths):
-        words_embs, mask = encode_text(text, text_lengths, self.gru_f, self.gru_b, self.device)
+        words_embs, mask = encode_text(text, text_lengths, self.gru_f,
+                                       self.gru_b, self.device)
         avg = self.avg(words_embs, mask)
         mu = self.mu_cond_aug(avg)
         log_sigma = self.sigma_cond_aug(avg)
@@ -126,7 +128,9 @@ class ConcatABResidualBlocks(nn.Module):
         )
 
     def forward(self, text_embed, image_embed):
-        text_embed = text_embed[:, :, None, None].repeat(1, 1, image_embed.size(2), image_embed.size(3))
+        text_embed = text_embed[:, :, None, None].repeat(1, 1,
+                                                         image_embed.size(2),
+                                                         image_embed.size(3))
         x = torch.cat((image_embed, text_embed), 1)
         return self.main(x)
 
@@ -195,7 +199,9 @@ class Discriminator(nn.Module):
         # IMAGE ENCODER
         self.conv3 = nn.Sequential(
             nn.Conv2d(3, 64, 4, 2, padding=1),
-            nn.LeakyReLU(0.2, inplace=True), # I'm including this 'inplace' part since the example I am following has used it
+            # I'm including this 'inplace' part since the example
+            # I am following has used it
+            nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(64, 128, 4, 2, padding=1, bias=False),
             nn.BatchNorm2d(128),
             nn.LeakyReLU(0.2, inplace=True),
@@ -216,14 +222,12 @@ class Discriminator(nn.Module):
             nn.LeakyReLU(0.2, inplace=True)
         )
 
-
         # UNCONDITIONAL DISCRIMINATOR
         self.un_disc = nn.Sequential(
             nn.Conv2d(512, 1, 4, padding=0, stride=1),
             nn.Sigmoid()
-            #nn.Softmax(dim=1)  # Removing this because final dimensions is B x 1 x 1. Where do we softmax?
+            # nn.Softmax(dim=1)
         )
-
 
         # TEXT ENCODER
         self.get_betas = nn.Sequential(
@@ -235,9 +239,6 @@ class Discriminator(nn.Module):
         self.gru_b = nn.GRUCell(input_size=300, hidden_size=512)
         self.avg = TemporalAverage()
 
-
-
-        #
         self.GAP1 = nn.Sequential(
             nn.Conv2d(256, 256, 3, padding=1, bias=False),
             nn.BatchNorm2d(256),
@@ -283,7 +284,8 @@ class Discriminator(nn.Module):
             return d.squeeze()
 
         # Get word embedding
-        words_embs, mask = encode_text(text, len_text, self.gru_f, self.gru_b, self.device)
+        words_embs, mask = encode_text(text, len_text, self.gru_f, self.gru_b,
+                                       self.device)
         avg = self.avg(words_embs, mask).unsqueeze(-1)
 
         # Calculate attentions
@@ -315,15 +317,17 @@ class Discriminator(nn.Module):
 
             W_neg = W[idx_neg]
             b_neg = b[idx_neg]
-            betas_neg = betas.permute(2,0,1)
+            betas_neg = betas.permute(2, 0, 1)
             f_neg = torch.sigmoid(torch.bmm(W_neg, image) + b_neg).squeeze(-1)
             total_neg += f_neg * betas_neg[j][idx_neg]
             f = torch.sigmoid(torch.bmm(W, image) + b).squeeze(-1)
             total += f * betas[:, :, j]
 
         alphas_neg = alphas[idx_neg, :]  # need to change this
-        total_neg = (alphas_neg*torch.log(total_neg)).sum(1)  # total_neg should be (batch_size)
-        total = (alphas*torch.log(total)).sum(1)  # total should be (batch_size)
+        # total_neg should be (batch_size)
+        total_neg = (alphas_neg * torch.log(total_neg)).sum(1)
+        # total should be (batch_size)
+        total = (alphas * torch.log(total)).sum(1)
 
         unconditional = d
         cond_positive = total
@@ -342,6 +346,7 @@ def initialize_parameters(model):
             model.weight.data.normal_(1, 0.02)
         if model.bias.requires_grad:
             model.bias.data.fill_(0)
+
 
 def encode_text(text, text_length, gru_f, gru_b, device="cpu"):
     batch, seq_len, input_size = text.shape
@@ -366,7 +371,9 @@ def encode_text(text, text_length, gru_f, gru_b, device="cpu"):
         hidden_f = gru_f(text[i], hidden_f)
         hidden_f_mat[i] = hidden_f * is_in_word
 
-        hidden_b = gru_b(text[- i - 1], hidden_b)  # -i-1 because the backward pass needs to incorporate both -i and and -i-1 words per hidden state i
+        # - i - 1 because the backward pass needs to incorporate both
+        # -i and -i - 1 words per hidden state i
+        hidden_b = gru_b(text[- i - 1], hidden_b)
         hidden_b_mat[-i] = hidden_b * is_in_word
 
     return ((hidden_f_mat + hidden_b_mat) / 2.0).permute(1, 0, 2), mask
