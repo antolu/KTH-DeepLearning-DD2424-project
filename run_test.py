@@ -103,50 +103,81 @@ if args.runtype == "train":
                             shuffle=True)
 
     lg = lgr = lsd = lrd = -1
-    generator_losses = open("generator_losses.csv", 'w')
-    discriminator_losses = open("discriminator_losses.csv", 'w')
-    generator_losses.write("epoch,batch,loss\n")
-    discriminator_losses.write("epoch,batch,loss\n")
-    total_steps = 0
+    losses = open("losses.csv", 'w')
+    losses.write("epoch,cond_disc_fake,cond_disc_real,uncond_disc_real,l1_reconstruction,kl,cond_p_gen,uncond_gen\n")
+
     try:
         with trange(args.no_epochs) as t:
             for epoch in t:
+                params = {
+                    "cond_disc_fake": 0.0,
+                    "cond_disc_real": 0.0,
+                    "uncond_disc_real": 0.0,
+                    "l1_reconstruction": 0.0,
+                    "kl": 0.0,
+                    "cond_p_gen": 0.0,
+                    "uncond_gen": 0.0
+                }
+                if ((epoch + 1) % 100) == 0:
+                    optimizers = [od, og]
+                    for o in optimizers:
+                        for param_group in o.param_groups:
+                            param_group['lr'] /= 2.0
+
                 for i_batch, (img, caption, no_words) in enumerate(dataloader):
                     # Do training
-
-                    if ((total_steps + 1) % 100) == 0:
-                        optimizers = [od, og]
-                        for o in optimizers:
-                            for param_group in o.param_groups:
-                                param_group['lr'] /= 2.0
 
                     img, caption, no_words = img.to(device), caption.to(device), no_words.to(device)
                     img = img.mul(2)
                     img = img.sub(1)
 
                     discriminator.zero_grad()
-                    lrd = loss_real_discriminator(img, caption, no_words, discriminator, generator, 10.0)
+                    no_words = no_words.squeeze()
+                    lrd = loss_real_discriminator(img, caption, no_words, discriminator, generator, 10.0, params)
                     lrd.backward()
-                    lsd = loss_synthetic_discriminator(img, caption, no_words, discriminator, generator, 10.0)
+                    lsd = loss_synthetic_discriminator(img, caption, no_words, discriminator, generator, params)
                     lsd.backward()
+                    score = lrd.detach().cpu().numpy().squeeze() + lsd.detach().cpu().numpy().squeeze()
                     od.step()
 
-                    generator.zero_grad()
-                    lg, fake, negative_text = loss_generator(img, caption, no_words, discriminator, generator, 10.0, 0.2)
-                    lg.backward()
-                    lgr, kld = loss_generator_reconstruction(img, caption, no_words, discriminator, generator, 10.0, 0.2)
-                    lgr.backward()
-                    score = lg.detach().cpu().numpy().squeeze() + lgr.detach().cpu().numpy().squeeze()
-                    generator_losses.write("{},{},{}\n".format(epoch, i_batch + 1, score))
-                    score = lrd.detach().cpu().numpy().squeeze() + lsd.detach().cpu().numpy().squeeze()
-                    discriminator_losses.write("{},{},{}\n".format(epoch, i_batch + 1, score))
-                    og.step()
+                    if (i_batch + 1) % 10 == 0:
+                        generator.zero_grad()
+                        lgs, fake, negative_text = loss_generator(img, caption, no_words, discriminator, generator, 10.0, params)
+                        lgs.backward()
+                        lgr, kld = loss_generator_reconstruction(img, caption, no_words, discriminator, generator, 2.0, params)
+                        lgr.backward()
+                        score = lgs.detach().cpu().numpy().squeeze() + lgr.detach().cpu().numpy().squeeze()
 
-                    t.set_description('Epoch: {} | Batch: {}/{} | LG: {} | LD: {} | KLD: {}'.format(
-                        epoch, i_batch + 1, ceil(len(train_set) / args.batch_size), lg + lgr, lrd + lsd, kld))
+                        og.step()
 
-                    total_steps += 1
+                    den = (i_batch + 1)
 
+                    cond_disc_fake = params["cond_disc_fake"] / den
+                    cond_disc_real = params["cond_disc_real"] / den
+                    l1_reconstruction = params["l1_reconstruction"] / den
+                    kl = params["kl"] / den * 10
+                    cond_p_gen = params["cond_p_gen"] / den * 10
+                    uncond_gen = params["uncond_gen"] / den * 10
+                    uncond_disc_real = params["uncond_disc_real"] / den
+
+                    print(
+                        f"""
+Epoch: {epoch}
+Batch: {den}/{ceil(len(train_set) / args.batch_size)}
+D:
+	uncond: {uncond_disc_real:.4}
+	cond_p: {cond_disc_real:.4}
+	cond_n: {cond_disc_fake:.4}
+G:
+	reconstruction: {l1_reconstruction:.4}
+	uncond: {uncond_gen:.4}
+	cond: {cond_p_gen:.4}
+KL: {kl:.4}"""
+                    )
+
+
+                losses.write(f"{epoch},{cond_disc_fake},{cond_disc_real},{uncond_disc_real},{l1_reconstruction},{kl},{cond_p_gen},{uncond_gen}\n")
+                    
                 if (epoch + 1) % 50 == 0:
                     torch.save(generator.state_dict(), "./models/run_G_dataset_{}_epoch_{}.pth".format(
                         args.dataset, epoch))
@@ -168,8 +199,7 @@ if args.runtype == "train":
         torch.save(og.state_dict(), "./models/run_og_dataset_{}_before_dying.pth".format(args.dataset))
         torch.save(generator.state_dict(), "./models/run_G_dataset_{}_before_dying.pth".format(args.dataset))
         torch.save(discriminator.state_dict(), "./models/run_D_dataset_{}_before_dying.pth".format(args.dataset))
-        discriminator_losses.close()
-        generator_losses.close()
+        losses.close()
 
 elif args.runtype == 'test':
     # How to call generator

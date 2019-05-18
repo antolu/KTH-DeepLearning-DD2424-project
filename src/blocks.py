@@ -225,7 +225,7 @@ class Discriminator(nn.Module):
         # UNCONDITIONAL DISCRIMINATOR
         self.un_disc = nn.Sequential(
             nn.Conv2d(512, 1, 4, padding=0, stride=1),
-            nn.Sigmoid()
+            # nn.Sigmoid()
             # nn.Softmax(dim=1)
         )
 
@@ -279,7 +279,7 @@ class Discriminator(nn.Module):
         GAP_image3 = self.GAP3(image3)
         GAP_images = [GAP_image1, GAP_image2, GAP_image3]
         d = self.un_disc(GAP_image3).squeeze()
-        d = torch.log(d)
+        # d = torch.log(d)
         if text is None:
             return d.squeeze()
 
@@ -325,9 +325,9 @@ class Discriminator(nn.Module):
 
         alphas_neg = alphas[idx_neg, :]  # need to change this
         # total_neg should be (batch_size)
-        total_neg = (alphas_neg * torch.log(total_neg)).sum(1)
+        total_neg = torch.pow(total_neg, alphas_neg).prod(1)
         # total should be (batch_size)
-        total = (alphas * torch.log(total)).sum(1)
+        total = torch.pow(total, alphas).prod(1)
 
         unconditional = d
         cond_positive = total
