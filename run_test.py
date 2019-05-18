@@ -98,8 +98,7 @@ if args.runtype == "train":
             args.pretrained_optimizer_generator)
         og.load_state_dict(pretrained_optimizer_generator)
 
-    batch_size = 8
-    dataloader = DataLoader(train_set, batch_size=batch_size, num_workers=4,
+    dataloader = DataLoader(train_set, batch_size=args.batch_size, num_workers=4,
                             shuffle=True)
 
     lg = lgr = lsd = lrd = -1
@@ -144,7 +143,7 @@ if args.runtype == "train":
 
                     total_steps += 1
                     t.set_description('Epoch: {} | Batch: {}/{} | LG: {} | LD: {}'.format(
-                        epoch, i_batch + 1, ceil(len(train_set) / batch_size), lg + lgr, lrd + lsd))
+                        epoch, i_batch + 1, ceil(len(train_set) / args.batch_size), lg + lgr, lrd + lsd))
 
                 if (epoch + 1) % 50 == 0:
                     torch.save(generator.state_dict(), "./models/run_G_dataset_{}_epoch_{}.pth".format(
