@@ -64,15 +64,16 @@ train_set, val_set, test_set = pd.get_datasets()
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print("Using device {}.".format(device))
 
-print("Loading pretrained model")
 generator = Generator(args.max_no_words, device).to(device)
 discriminator = Discriminator(args.max_no_words, device).to(device)
 
 # Load pretrained models
 if args.pretrained_generator is not None:
+    print("Loading pretrained generator")
     pretrained_generator = torch.load(args.pretrained_generator)
     generator.load_state_dict(pretrained_generator, strict=False)
 if args.pretrained_discriminator is not None:
+    print("Loading pretrained discriminator")
     pretrained_discriminator = torch.load(args.pretrained_discriminator)
     discriminator.load_state_dict(pretrained_discriminator, strict=False)
 
