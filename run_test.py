@@ -158,10 +158,8 @@ if args.runtype == "train":
                         args.dataset, epoch))
                 img_vis = img.mul(0.5).add(0.5)
                 vis.images(img_vis.cpu().detach().numpy(), nrow=4, opts=dict(title='original'))
-                vis.text(caption.cpu().detach().numpy(), opts=dict(title="original captions"))
                 fake_vis = fake.mul(0.5).add(0.5)
                 vis.images(fake_vis.cpu().detach().numpy(), nrow=4, opts=dict(title='generated'))
-                vis.text(negative_text.cpu().detach().numpy(), opts=dict(title="original captions"))
 
     except KeyboardInterrupt:
         pass
