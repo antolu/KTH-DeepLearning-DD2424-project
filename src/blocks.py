@@ -297,7 +297,7 @@ class Discriminator(nn.Module):
 
         total = 0
         total_neg = 0
-        
+
 
         idx = np.arange(0, image.size(0))
         idx_neg = torch.tensor(np.roll(idx, 1))

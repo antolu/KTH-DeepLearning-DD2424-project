@@ -1,23 +1,20 @@
 import sys
 sys.path.append("src")
 
-from math import ceil
-
 import matplotlib
 import numpy as np
 import torch.optim as optim
 import visdom
 import torch
 from blocks import Discriminator
-from blocks import Discriminator_authors
 from loss import loss_real_discriminator, loss_synthetic_discriminator
 from loss import loss_generator, loss_generator_reconstruction
+from math import ceil
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from tqdm import trange
 from utils import Utils
 from blocks import Generator
-from blocks import Generator_authors
 from image_io import disp_sidebyside
 from load_dataset import ParseDatasets
 from preprocess_caption import PreprocessCaption
@@ -65,10 +62,10 @@ train_set, val_set, test_set = pd.get_datasets()
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print("Using device {}.".format(device))
 
-# generator = Generator(args.max_no_words, device).to(device)
-generator = Generator_authors().to(device)
-# discriminator = Discriminator(args.max_no_words, device).to(device)
-discriminator = Discriminator_authors().to(device)
+generator = Generator(args.max_no_words, device).to(device)
+# generator = Generator_authors().to(device)
+discriminator = Discriminator(args.max_no_words, device).to(device)
+# discriminator = Discriminator_authors().to(device)
 
 # Load pretrained models
 if args.pretrained_generator is not None:
@@ -134,8 +131,8 @@ if args.runtype == "train":
                     img = img.mul(2)
                     img = img.sub(1)
 
-                    caption = caption.permute(1, 0, 2)
-                    
+                    # caption = caption.permute(1, 0, 2)
+
                     discriminator.zero_grad()
                     no_words = no_words.squeeze()
                     lrd = loss_real_discriminator(img, caption, no_words, discriminator, generator, 10.0, params)
@@ -146,9 +143,11 @@ if args.runtype == "train":
                     od.step()
 
                     generator.zero_grad()
-                    lgs, fake, negative_text = loss_generator(img, caption, no_words, discriminator, generator, 10.0, params)
+                    lgs, fake, negative_text = loss_generator(img, caption, no_words, discriminator, generator, 10.0,
+                                                              params)
                     lgs.backward()
-                    lgr, kld = loss_generator_reconstruction(img, caption, no_words, discriminator, generator, 2.0, params)
+                    lgr, kld = loss_generator_reconstruction(img, caption, no_words, discriminator, generator, 2.0,
+                                                             params)
                     lgr.backward()
                     score = lgs.detach().cpu().numpy().squeeze() + lgr.detach().cpu().numpy().squeeze()
 
@@ -165,23 +164,22 @@ if args.runtype == "train":
                     uncond_disc_real = params["uncond_disc_real"] / den
 
                     print(
-                        f"""
-Epoch: {epoch}
-Batch: {den}/{ceil(len(train_set) / args.batch_size)}
-D:
-	uncond: {uncond_disc_real:.4}
-	cond_p: {cond_disc_real:.4}
-	cond_n: {cond_disc_fake:.4}
-G:
-	reconstruction: {l1_reconstruction:.4}
-	uncond: {uncond_gen:.4}
-	cond: {cond_p_gen:.4}
-KL: {kl:.4}"""
+                        f"Epoch: {epoch}\n"
+                        f"Batch: {den}/{ceil(len(train_set) / args.batch_size)}\n"
+                        f"D:\n"
+                        f"\tuncond: {uncond_disc_real:.4}\n"
+                        f"\tcond_p: {cond_disc_real:.4}\n"
+                        f"\tcond_n: {cond_disc_fake:.4}\n"
+                        f"G:\n"
+                        f"\treconstruction: {l1_reconstruction:.4}\n"
+                        f"\tuncond: {uncond_gen:.4}\n"
+                        f"\tcond: {cond_p_gen:.4}\n"
+                        f"KL: {kl:.4}\n"
                     )
 
+                losses.write(f"{epoch},{cond_disc_fake},{cond_disc_real},{uncond_disc_real}"
+                             ",{l1_reconstruction},{kl},{cond_p_gen},{uncond_gen}\n")
 
-                losses.write(f"{epoch},{cond_disc_fake},{cond_disc_real},{uncond_disc_real},{l1_reconstruction},{kl},{cond_p_gen},{uncond_gen}\n")
-                    
                 if (epoch + 1) % 50 == 0:
                     torch.save(generator.state_dict(), "./models/run_G_dataset_{}_epoch_{}.pth".format(
                         args.dataset, epoch))
