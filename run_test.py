@@ -82,9 +82,9 @@ if args.runtype == "train":
     discriminator.train()
 
     od = optim.Adam(generator.parameters(),
-                    lr=0.0002/16,
+                    lr=0.0002,
                     betas=(0.5, 0.999))
-    og = optim.Adam(discriminator.parameters(), lr=0.0002/16,
+    og = optim.Adam(discriminator.parameters(), lr=0.0002,
                     betas=(0.5, 0.999))
 
     # Load pretrained optimizers
@@ -98,7 +98,8 @@ if args.runtype == "train":
             args.pretrained_optimizer_generator)
         og.load_state_dict(pretrained_optimizer_generator)
 
-    dataloader = DataLoader(train_set, batch_size=64, num_workers=4,
+    batch_size = 8
+    dataloader = DataLoader(train_set, batch_size=batch_size, num_workers=4,
                             shuffle=True)
 
     lg = lgr = lsd = lrd = -1
