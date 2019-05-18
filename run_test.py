@@ -1,24 +1,28 @@
-import matplotlib
 import sys
 sys.path.append("src")
-from blocks import Discriminator
-from utils import Utils
-from loss import loss_real_discriminator, loss_synthetic_discriminator, loss_generator, loss_generator_reconstruction
-import visdom
-matplotlib.use('tkagg')
-import matplotlib.pyplot as plt
 
-import numpy as np
-from tqdm import trange
 from math import ceil
-from src.blocks import Generator
-from src.image_io import *
-from src.load_dataset import ParseDatasets, Dataset
-from src.preprocess_caption import PreprocessCaption
 
-import torch, torch.optim as optim
+import matplotlib
+import numpy as np
+import torch.optim as optim
+import visdom
+import torch
+from blocks import Discriminator
+from loss import loss_real_discriminator, loss_synthetic_discriminator
+from loss import loss_generator, loss_generator_reconstruction
 from torch.utils.data import DataLoader
 from torchvision import transforms
+from tqdm import trange
+from utils import Utils
+
+from src.blocks import Generator
+from src.image_io import disp_sidebyside
+from src.load_dataset import ParseDatasets
+from src.preprocess_caption import PreprocessCaption
+
+
+matplotlib.use('tkagg')
 
 torch.manual_seed(0)
 
@@ -27,9 +31,9 @@ args = Utils.parse_args()
 # Check arguments
 supported_datasets = ["cub", "oxford", "coco"]
 supported_coco_sets = ["train", "val", "test", None]
-if args.dataset not in supported_datasets :
+if args.dataset not in supported_datasets:
     raise Exception("The supplied dataset parameter {} is not supported.".format(args.dataset))
-if args.coco_set not in supported_coco_sets :
+if args.coco_set not in supported_coco_sets:
     raise Exception("The supplied coco set parameter {} is not supported.".format(args.coco_set))
 
 # Load fastText
@@ -45,20 +49,20 @@ tf = transforms.Compose([
     transforms.ToTensor()
 ])
 
-if args.blacklist is not None :
+if args.blacklist is not None:
     blacklist = Utils.read_blacklist(args.blacklist)
-else :
+else:
     blacklist = None
 
 # Parse datasets
 print("Parsing datasets")
-pd = ParseDatasets(dataset=args.dataset, images_root=args.images_root, annotations_root=args.annotations_root, preprocess_caption=pc, transform=tf, blacklist=blacklist)
+pd = ParseDatasets(dataset=args.dataset, images_root=args.images_root, annotations_root=args.annotations_root,
+                   preprocess_caption=pc, transform=tf, blacklist=blacklist)
 
 train_set, val_set, test_set = pd.get_datasets()
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print("Using device {}.".format(device))
-
 
 print("Loading pretrained model")
 generator = Generator(args.max_no_words, device).to(device)
@@ -107,8 +111,6 @@ if args.runtype == "train":
         with trange(args.no_epochs) as t:
             for epoch in t:
                 for i_batch, (img, caption, no_words) in enumerate(dataloader):
-                    t.set_description('Epoch: {} | Batch: {}/{} | LG: {} | LD: {}'.format(
-                        epoch, i_batch + 1, ceil(len(train_set)/64), lg + lgr, lrd + lsd))
                     # Do training
 
                     if ((total_steps + 1) % 100) == 0:
@@ -133,11 +135,15 @@ if args.runtype == "train":
                     lg.backward()
                     lgr = loss_generator_reconstruction(img, caption, no_words, discriminator, generator, 10.0, 0.2)
                     lgr.backward()
-                    generator_losses.write("{},{},{}\n".format(epoch, i_batch + 1, lg.detach().cpu().numpy().squeeze() + lgr.detach().cpu().numpy().squeeze()))
-                    discriminator_losses.write("{},{},{}\n".format(epoch, i_batch + 1, lrd.detach().cpu().numpy().squeeze() + lsd.detach().cpu().numpy().squeeze()))
+                    score = lg.detach().cpu().numpy().squeeze() + lgr.detach().cpu().numpy().squeeze()
+                    generator_losses.write("{},{},{}\n".format(epoch, i_batch + 1, score))
+                    score = lrd.detach().cpu().numpy().squeeze() + lsd.detach().cpu().numpy().squeeze()
+                    discriminator_losses.write("{},{},{}\n".format(epoch, i_batch + 1, score))
                     og.step()
 
                     total_steps += 1
+                    t.set_description('Epoch: {} | Batch: {}/{} | LG: {} | LD: {}'.format(
+                        epoch, i_batch + 1, ceil(len(train_set)/64), lg + lgr, lrd + lsd))
                     
                 if (epoch + 1) % 50 == 0:
                     torch.save(generator.state_dict(), "./models/run_G_dataset_{}_epoch_{}.pth".format(args.dataset, epoch))
@@ -146,8 +152,10 @@ if args.runtype == "train":
                     torch.save(og.state_dict(), "./models/run_og_dataset_{}_epoch_{}.pth".format(args.dataset, epoch))
                 img_vis = img.mul(0.5).add(0.5)
                 vis.images(img_vis.cpu().detach().numpy(), nrow=4, opts=dict(title='original'))
+                vis.text()
                 fake_vis = fake.mul(0.5).add(0.5)
                 vis.images(fake_vis.cpu().detach().numpy(), nrow=4, opts=dict(title='generated'))
+
     except KeyboardInterrupt:
         pass
     finally:
