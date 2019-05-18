@@ -78,9 +78,9 @@ if args.runtype == "train":
     discriminator.train()
 
     od = optim.Adam(generator.parameters(),
-                    lr=0.0002/16,
+                    lr=0.0002,
                     betas=(0.5, 0.999))
-    og = optim.Adam(discriminator.parameters(), lr=0.0002/16,
+    og = optim.Adam(discriminator.parameters(), lr=0.0002,
                     betas=(0.5, 0.999))
 
     # Load pretrained optimizers
@@ -94,7 +94,8 @@ if args.runtype == "train":
             args.pretrained_optimizer_generator)
         og.load_state_dict(pretrained_optimizer_generator)
 
-    dataloader = DataLoader(train_set, batch_size=64, num_workers=4,
+    batch_size = 8
+    dataloader = DataLoader(train_set, batch_size=batch_size, num_workers=4,
                             shuffle=True)
 
     lg = lgr = lsd = lrd = -1
@@ -108,7 +109,7 @@ if args.runtype == "train":
             for epoch in t:
                 for i_batch, (img, caption, no_words) in enumerate(dataloader):
                     t.set_description('Epoch: {} | Batch: {}/{} | LG: {} | LD: {}'.format(
-                        epoch, i_batch + 1, ceil(len(train_set)/64), lg + lgr, lrd + lsd))
+                        epoch, i_batch + 1, ceil(len(train_set)/batch_size), lg + lgr, lrd + lsd))
                     # Do training
 
                     if ((total_steps + 1) % 100) == 0:
