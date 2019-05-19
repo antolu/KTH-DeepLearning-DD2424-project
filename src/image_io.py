@@ -1,6 +1,9 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+from PIL import Image
+import os
+
 
 def disp_tensor(tnsr) :
     """
@@ -39,3 +42,14 @@ def disp_sidebyside(images, caption=None) :
     plt.show(block=True)
     f.clear()
     plt.close(f)
+
+def save_img(img, caption, filename, dir="") :
+    if type(img) is torch.Tensor :
+            img = img.detach().permute(1, 2, 0).numpy()
+            im = Image.fromarray(img.astype('uint8'))
+    else :
+        im = img
+    im.save(os.path.join(dir, "img_{}.jpeg".format(filename)))
+
+    with open(os.path.join(dir, "cap_{}.txt".format(filename)), "w") as f:
+        f.write(caption + "\n")

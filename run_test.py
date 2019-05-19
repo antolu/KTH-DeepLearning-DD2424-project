@@ -35,13 +35,20 @@ pc = PreprocessCaption(args.fasttext_model)
 pc.load_fasttext()
 
 # Initialise transform
-tf = transforms.Compose([
-    transforms.Resize(136),
-    transforms.RandomCrop(128),
-    transforms.RandomRotation((-10, 10)),
-    transforms.RandomHorizontalFlip(),
-    transforms.ToTensor()
-])
+if args.runtype == "train" :
+    tf = transforms.Compose([
+        transforms.Resize(136),
+        transforms.RandomCrop(128),
+        transforms.RandomRotation((-10, 10)),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor()
+    ])
+elif args.runtype == "test" :
+    tf = transforms.Compose([
+        transforms.Resize(136),
+        transforms.RandomCrop(128),
+        transforms.ToTensor()
+    ])
 
 if args.blacklist is not None :
     blacklist = Utils.read_blacklist(args.blacklist)
@@ -171,6 +178,9 @@ elif args.runtype == 'test':
         generated, _, _ = generator(tensor.unsqueeze(0).to(device), caption_vec.unsqueeze(0).to(device), no_words.to(device))
 
         disp_sidebyside([img, tensor.cpu().squeeze(), generated.cpu().squeeze()], caption=cap)
+
+        save_img(img, caption, "{}_orig".format(i), "results")
+        save_img(generated.cpu().squeeze(), cap, "{}_gen".format(i), "results")
 
         prompt = input("Do you want to keep generating more images? (y/n) ")
         if prompt != "y" :
