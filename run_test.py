@@ -161,15 +161,15 @@ if args.runtype == "train":
                     uncond_disc_real = params["uncond_disc_real"] / den
 
                     t.set_description(
-                        f"Epoch: {epoch} | "
-                        f"Batch: {den}/{ceil(len(train_set) / args.batch_size)} | "
-                        f"uncond_disc: {uncond_disc_real:.4} | "
-                        f"cond_p_disc: {cond_disc_real:.4} | "
-                        f"cond_n_disc: {cond_disc_fake:.4} | "
-                        f"reconstruction: {l1_reconstruction:.4} | "
-                        f"uncond_gen: {uncond_gen:.4} | "
-                        f"cond_gen: {cond_p_gen:.4} | "
-                        f"KL: {kl:.4}"
+                        f"E:{epoch} | "
+                        f"B:{den}/{ceil(len(train_set) / args.batch_size)} | "
+                        f"u_d: {uncond_disc_real:.4} | "
+                        f"c_p_d: {cond_disc_real:.4} | "
+                        f"c_n_d: {cond_disc_fake:.4} | "
+                        f"l1: {l1_reconstruction:.4} | "
+                        f"u_g: {uncond_gen:.4} | "
+                        f"c_g: {cond_p_gen:.4} | "
+                        f"k: {kl:.4}"
                     )
 
                 losses.write(f"{epoch},{cond_disc_fake},{cond_disc_real},{uncond_disc_real}"
