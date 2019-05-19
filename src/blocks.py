@@ -7,26 +7,26 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+# Generator blocks
 class Generator(nn.Module):
+    """Main generator block"""
     def __init__(self, device="cpu"):
         super().__init__()
         self.device = device
         self.a = TextEncoderGenerator(device)
         self.b = ImageEncoderGenerator()
         self.ab = ConcatABResidualBlocks()
-
         self.d = Decoder()
         self.apply(initialize_parameters)
 
     def forward(self, ximage, xtext, xtext_lengths):
-        # x includes both the text and the image
-        a, mu, sigma = self.a(xtext, xtext_lengths)
+        a, mu, log_sigma = self.a(xtext, xtext_lengths)
+        # mu and log_sigma proceed from the conditioning augmentation block.
+        # They go into the loss function for minimizing their KL divergence with a N(0, I)
         b = self.b(ximage)
-        ab = self.ab(a, b)
-        # c = b + ab
-        c = ab
+        c = self.ab(a, b)
         d = self.d(b + c)
-        return d, mu, sigma
+        return d, mu, log_sigma
 
 
 class ConditioningAugmentation(nn.Module):
@@ -37,8 +37,7 @@ class ConditioningAugmentation(nn.Module):
     def forward(self, mu, sigma):
         res = torch.zeros_like(mu)
         for i in range(mu.size(0)):
-            res[i] = torch.randn(
-                mu[i].shape).to(self.device) * sigma[i] + mu[i]
+            res[i] = torch.randn(mu[i].shape).to(self.device) * sigma[i] + mu[i]
         return res
 
 
@@ -53,7 +52,6 @@ class TextEncoderGenerator(nn.Module):
         self.device = device
         self.gru_f = nn.GRUCell(input_size=300, hidden_size=512).to(device)
         self.gru_b = nn.GRUCell(input_size=300, hidden_size=512).to(device)
-
         self.avg = TemporalAverage()
         self.mu_cond_aug = nn.Sequential(
             OrderedDict(
@@ -63,7 +61,6 @@ class TextEncoderGenerator(nn.Module):
                 ]
             )
         )
-
         self.sigma_cond_aug = nn.Sequential(
             OrderedDict(
                 [
@@ -76,8 +73,7 @@ class TextEncoderGenerator(nn.Module):
         self.cond_aug = ConditioningAugmentation(device)
 
     def forward(self, text, text_lengths):
-        words_embs, mask = encode_text(text, text_lengths, self.gru_f,
-                                       self.gru_b, self.device)
+        words_embs, mask = encode_text(text, text_lengths, self.gru_f, self.gru_b, self.device)
         avg = self.avg(words_embs, mask)
         mu = self.mu_cond_aug(avg)
         log_sigma = self.sigma_cond_aug(avg)
@@ -92,7 +88,6 @@ class ImageEncoderGenerator(nn.Module):
             ('conv1', nn.Conv2d(3, 64, 3, 1, 1)),
             ('act1', nn.ReLU(inplace=True)),
 
-            # BN already includes a bias
             ('conv2', nn.Conv2d(64, 128, 4, 2, 1, bias=False)),
             ('bn2', nn.BatchNorm2d(128)),
             ('act2', nn.ReLU(inplace=True)),
@@ -197,15 +192,94 @@ class Discriminator(nn.Module):
         self.device = device
         self.eps = 1e-8
 
-        # IMAGE ENCODER
-        self.conv3 = nn.Sequential(
-            nn.Conv2d(3, 64, 4, 2, padding=1),
-            nn.LeakyReLU(0.2, inplace=True),
+        # Unconditional Discriminator
+        self.un_disc = nn.Conv2d(512, 1, 4, padding=0, stride=1)
 
+        self.img_enc = ImageEncoderDiscriminator()
+
+        # Text Encoder
+        self.get_betas = nn.Sequential(
+            nn.Linear(512, 3),
+            nn.Softmax(dim=2)
+        )
+
+        self.gru_f = nn.GRUCell(input_size=300, hidden_size=512)
+        self.gru_b = nn.GRUCell(input_size=300, hidden_size=512)
+        self.avg = TemporalAverage()
+
+        # Conditional Discriminator contained in forward pass
+        self.Wb1 = nn.Linear(512, 257)
+        self.Wb2 = nn.Linear(512, 513)
+        self.Wb3 = nn.Linear(512, 513)
+        self.Wb = [self.Wb1, self.Wb2, self.Wb3]
+
+        self.apply(initialize_parameters)
+
+    def forward(self, image, text=None, len_text=None):
+        GAP_images = self.img_enc(image)
+        uncond_logit = self.un_disc(GAP_images[-1]).squeeze()
+
+        # If no captions supplied, return only the unconditional logit
+        if text is None:
+            return uncond_logit.squeeze()
+
+        # Get word embedding
+        words_embs, mask = encode_text(text, len_text, self.gru_f, self.gru_b, self.device)
+        avg = self.avg(words_embs, mask).unsqueeze(-1)
+
+        # Calculate attentions
+        u_dot_wi = torch.bmm(words_embs, avg).squeeze(-1)
+        alphas = F.softmax(u_dot_wi, dim=1).permute(0, 1)
+
+        # Get weights
+        betas = self.get_betas(words_embs)
+
+        cond_positive = 0
+        cond_negative = 0
+
+        idx = torch.arange(image.size(0))
+        idx_neg = torch.tensor(np.roll(idx, 1))
+
+        for j in range(3):
+            image = GAP_images[j]
+            image = image.mean(-1).mean(-1).unsqueeze(-1)
+
+            Wb = self.Wb[j](words_embs)
+
+            W = Wb[:, :, :-1]
+            b = Wb[:, :, -1].unsqueeze(-1)
+
+            W_neg = W[idx_neg]
+            b_neg = b[idx_neg]
+            betas_neg = betas.permute(2, 0, 1)
+            f_neg = torch.sigmoid(torch.bmm(W_neg, image) + b_neg).squeeze(-1)
+            cond_negative += f_neg * betas_neg[j][idx_neg]
+            f = torch.sigmoid(torch.bmm(W, image) + b).squeeze(-1)
+            cond_positive += f * betas[:, :, j]
+
+        alphas_neg = alphas[idx_neg, :]
+        cond_negative = (alphas_neg * torch.clamp(torch.log(cond_negative + self.eps), max=0)).sum(1)
+        cond_positive = (alphas * torch.clamp(torch.log(cond_positive + self.eps), max=0)).sum(1)
+        return uncond_logit, cond_positive, cond_negative
+
+
+class ImageEncoderDiscriminator(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+        # Image Encoder
+        self.conv1 = nn.Sequential(
+            nn.Conv2d(3, 64, 4, 2, padding=1),
+            nn.LeakyReLU(0.2, inplace=True)
+        )
+
+        self.conv2 = nn.Sequential(
             nn.Conv2d(64, 128, 4, 2, padding=1, bias=False),
             nn.BatchNorm2d(128),
-            nn.LeakyReLU(0.2, inplace=True),
+            nn.LeakyReLU(0.2, inplace=True)
+        )
 
+        self.conv3 = nn.Sequential(
             nn.Conv2d(128, 256, 4, 2, padding=1, bias=False),
             nn.BatchNorm2d(256),
             nn.LeakyReLU(0.2, inplace=True)
@@ -223,117 +297,35 @@ class Discriminator(nn.Module):
             nn.LeakyReLU(0.2, inplace=True)
         )
 
-        # UNCONDITIONAL DISCRIMINATOR
-        self.un_disc = nn.Sequential(
-            nn.Conv2d(512, 1, 4, padding=0, stride=1),
-            # nn.Sigmoid()
-            # nn.Softmax(dim=1)
-        )
-
-        # TEXT ENCODER
-        self.get_betas = nn.Sequential(
-            nn.Linear(512, 3),
-            nn.Softmax(dim=2)
-        )
-
-        self.gru_f = nn.GRUCell(input_size=300, hidden_size=512)
-        self.gru_b = nn.GRUCell(input_size=300, hidden_size=512)
-        self.avg = TemporalAverage()
-
-        self.GAP1 = nn.Sequential(
+        self.GAP3 = nn.Sequential(
             nn.Conv2d(256, 256, 3, padding=1, bias=False),
             nn.BatchNorm2d(256),
             nn.LeakyReLU(0.2, inplace=True)
         )
 
-        self.GAP2 = nn.Sequential(
+        self.GAP4 = nn.Sequential(
             nn.Conv2d(512, 512, 3, padding=1, bias=False),
             nn.BatchNorm2d(512),
             nn.LeakyReLU(0.2, inplace=True)
         )
 
-        # This is same as self.GAP2
-        self.GAP3 = nn.Sequential(
+        self.GAP5 = nn.Sequential(
             nn.Conv2d(512, 512, 3, padding=1, bias=False),
             nn.BatchNorm2d(512),
             nn.LeakyReLU(0.2, inplace=True)
         )
 
-        # CONDITIONAL DISCRIMINATOR contained in forward pass
-
-        # self.get_Wb1 = nn.Linear(512, 257)
-        # self.get_Wb2 = nn.Linear(512, 513)
-        self.Wb1 = nn.Linear(512, 257)
-        self.Wb2 = nn.Linear(512, 513)
-        self.Wb3 = nn.Linear(512, 513)
-        self.Wb = [self.Wb1, self.Wb2, self.Wb3]
-
-        self.apply(initialize_parameters)
-
-    def forward(self, image, text=None, len_text=None):
-
-        image1 = self.conv3(image)
-        image2 = self.conv4(image1)
-        image3 = self.conv5(image2)
-        GAP_image1 = self.GAP1(image1)
-        GAP_image2 = self.GAP2(image2)
+    def forward(self, image):
+        image1 = self.conv1(image)
+        image2 = self.conv2(image1)
+        image3 = self.conv3(image2)
+        image4 = self.conv4(image3)
+        image5 = self.conv5(image4)
         GAP_image3 = self.GAP3(image3)
-        GAP_images = [GAP_image1, GAP_image2, GAP_image3]
-        d = self.un_disc(GAP_image3).squeeze()
-        # d = torch.log(d)
-        if text is None:
-            return d.squeeze()
-
-        # Get word embedding
-        words_embs, mask = encode_text(text, len_text, self.gru_f, self.gru_b,
-                                       self.device)
-        avg = self.avg(words_embs, mask).unsqueeze(-1)
-
-        # Calculate attentions
-        u_dot_wi = torch.bmm(words_embs, avg).squeeze(-1)
-        alphas = F.softmax(u_dot_wi, dim=1).permute(0, 1)
-
-        # Get weights
-        betas = self.get_betas(words_embs)
-
-        total = 0
-        total_neg = 0
-
-        idx = torch.arange(image.size(0))
-        idx_neg = torch.tensor(np.roll(idx, 1))
-
-        for j in range(3):
-            image = GAP_images[j]
-            image = image.mean(-1).mean(-1).unsqueeze(-1)
-
-            # if j == 0:
-            #     Wb = self.get_Wb1(words_embs)
-            # else:
-            #     Wb = self.get_Wb2(words_embs)
-
-            Wb = self.Wb[j](words_embs)
-
-            W = Wb[:, :, :-1]
-            b = Wb[:, :, -1].unsqueeze(-1)
-
-            W_neg = W[idx_neg]
-            b_neg = b[idx_neg]
-            betas_neg = betas.permute(2, 0, 1)
-            f_neg = torch.sigmoid(torch.bmm(W_neg, image) + b_neg).squeeze(-1)
-            total_neg += f_neg * betas_neg[j][idx_neg]
-            f = torch.sigmoid(torch.bmm(W, image) + b).squeeze(-1)
-            total += f * betas[:, :, j]
-
-        alphas_neg = alphas[idx_neg, :]  # need to change this
-        # total_neg should be (batch_size)
-        total_neg = (alphas_neg * torch.clamp(torch.log(total_neg + self.eps), max=0)).sum(1)
-        # total should be (batch_size)
-        total = (alphas * torch.clamp(torch.log(total + self.eps), max=0)).sum(1)
-
-        unconditional = d
-        cond_positive = total
-        cond_negative = total_neg
-        return unconditional, cond_positive, cond_negative
+        GAP_image4 = self.GAP4(image4)
+        GAP_image5 = self.GAP5(image5)
+        GAP_images = [GAP_image3, GAP_image4, GAP_image5]
+        return GAP_images
 
 
 def initialize_parameters(model):
