@@ -178,7 +178,7 @@ if args.runtype == "train":
                     )
 
                 losses.write(f"{epoch},{cond_disc_fake},{cond_disc_real},{uncond_disc_real}"
-                             ",{l1_reconstruction},{kl},{cond_p_gen},{uncond_gen}\n")
+                             f",{l1_reconstruction},{kl},{cond_p_gen},{uncond_gen}\n")
 
                 if (epoch + 1) % 50 == 0:
                     torch.save(generator.state_dict(), "./models/run_G_dataset_{}_epoch_{}.pth".format(
