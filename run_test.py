@@ -160,18 +160,16 @@ if args.runtype == "train":
                     uncond_gen = params["uncond_gen"] / den
                     uncond_disc_real = params["uncond_disc_real"] / den
 
-                    print(
-                        f"Epoch: {epoch}\n"
-                        f"Batch: {den}/{ceil(len(train_set) / args.batch_size)}\n"
-                        f"D:\n"
-                        f"\tuncond: {uncond_disc_real:.4}\n"
-                        f"\tcond_p: {cond_disc_real:.4}\n"
-                        f"\tcond_n: {cond_disc_fake:.4}\n"
-                        f"G:\n"
-                        f"\treconstruction: {l1_reconstruction:.4}\n"
-                        f"\tuncond: {uncond_gen:.4}\n"
-                        f"\tcond: {cond_p_gen:.4}\n"
-                        f"KL: {kl:.4}\n"
+                    t.set_description(
+                        f"Epoch: {epoch} | "
+                        f"Batch: {den}/{ceil(len(train_set) / args.batch_size)} | "
+                        f"uncond_disc: {uncond_disc_real:.4} | "
+                        f"cond_p_disc: {cond_disc_real:.4} | "
+                        f"cond_n_disc: {cond_disc_fake:.4} | "
+                        f"reconstruction: {l1_reconstruction:.4} | "
+                        f"uncond_gen: {uncond_gen:.4} | "
+                        f"cond_gen: {cond_p_gen:.4} | "
+                        f"KL: {kl:.4}"
                     )
 
                 losses.write(f"{epoch},{cond_disc_fake},{cond_disc_real},{uncond_disc_real}"
