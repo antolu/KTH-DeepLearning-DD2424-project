@@ -38,7 +38,7 @@ pc = PreprocessCaption(args.fasttext_model)
 pc.load_fasttext()
 
 # Initialise transform
-if args.runtype == "train" :
+if args.mode == "train" :
     tf = transforms.Compose([
         transforms.Resize(136),
         transforms.RandomCrop(128),
@@ -46,7 +46,7 @@ if args.runtype == "train" :
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor()
     ])
-elif args.runtype == "test" :
+elif args.mode == "test" :
     tf = transforms.Compose([
         transforms.Resize(136),
         transforms.RandomCrop(128),
@@ -81,7 +81,7 @@ if args.pretrained_discriminator is not None:
     pretrained_discriminator = torch.load(args.pretrained_discriminator)
     discriminator.load_state_dict(pretrained_discriminator, strict=False)
 
-if args.runtype == "train":
+if args.mode == "train":
     vis = visdom.Visdom()
     generator.train()
     discriminator.train()
@@ -205,7 +205,7 @@ if args.runtype == "train":
         torch.save(discriminator.state_dict(), "./models/run_D_dataset_{}_before_dying.pth".format(args.dataset))
         losses.close()
 
-elif args.runtype == 'test':
+elif args.mode == 'test':
     # How to call generator
     print("Calling generator")
     generator.eval()
