@@ -5,6 +5,17 @@ from torch.nn.functional import l1_loss as l1, binary_cross_entropy_with_logits 
 class Loss:
     """Losses used for training TAGAN"""
     def __init__(self, image, text, text_length, generator, discriminator, params, lambda_1=10.0, lambda_2=0.2):
+        """
+        Keyword Arguments:
+        image         -- Batch of images tensor
+        text          -- Batch of text captions tensor
+        text_length   -- Lengths of the captions for every element in the batch
+        generator     -- Generator model
+        discriminator -- Discriminator model
+        params        -- Parameters dictionary
+        lambda_1      -- Conditional losses weight parameter (default 10.0)
+        lambda_2      -- Reconstruction loss weight parameter (default 0.2)
+        """
         self.lambda_1 = lambda_1
         self.lambda_2 = lambda_2
         self.generator = generator
