@@ -145,7 +145,7 @@ if args.runtype == "train":
                     lgs, fake, negative_text = loss_generator(img, caption, no_words, discriminator, generator, 10.0,
                                                               params)
                     lgs.backward()
-                    lgr, kld = loss_generator_reconstruction(img, caption, no_words, discriminator, generator, 2.0,
+                    lgr, kld = loss_generator_reconstruction(img, caption, no_words, discriminator, generator, 0.2,
                                                              params)
                     lgr.backward()
                     og.step()
