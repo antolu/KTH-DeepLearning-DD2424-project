@@ -68,10 +68,8 @@ train_set, val_set, test_set = pd.get_datasets()
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print("Using device {}.".format(device))
 
-generator = Generator(args.max_no_words, device).to(device)
-# generator = Generator_authors().to(device)
-discriminator = Discriminator(args.max_no_words, device).to(device)
-# discriminator = Discriminator_authors().to(device)
+generator = Generator(device).to(device)
+discriminator = Discriminator(device).to(device)
 
 # Load pretrained models
 if args.pretrained_generator is not None:

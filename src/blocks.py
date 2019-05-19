@@ -8,10 +8,10 @@ import torch.nn.functional as F
 
 
 class Generator(nn.Module):
-    def __init__(self, num_words, device="cpu"):
+    def __init__(self, device="cpu"):
         super().__init__()
         self.device = device
-        self.a = TextEncoderGenerator(num_words, device)
+        self.a = TextEncoderGenerator(device)
         self.b = ImageEncoderGenerator()
         self.ab = ConcatABResidualBlocks()
 
@@ -48,7 +48,7 @@ class TemporalAverage(nn.Module):
 
 
 class TextEncoderGenerator(nn.Module):
-    def __init__(self, num_words, device="cpu"):
+    def __init__(self, device="cpu"):
         super().__init__()
         self.device = device
         self.gru_f = nn.GRUCell(input_size=300, hidden_size=512).to(device)
@@ -192,7 +192,7 @@ class Decoder(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, num_words, device="cpu"):
+    def __init__(self, device="cpu"):
         super().__init__()
         self.device = device
         self.eps = 1e-8
