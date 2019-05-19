@@ -163,13 +163,13 @@ if args.runtype == "train":
                     t.set_description(
                         f"E:{epoch} | "
                         f"B:{den}/{ceil(len(train_set) / args.batch_size)} | "
-                        f"u_d: {uncond_disc_real:.4} | "
-                        f"c_p_d: {cond_disc_real:.4} | "
-                        f"c_n_d: {cond_disc_fake:.4} | "
-                        f"l1: {l1_reconstruction:.4} | "
-                        f"u_g: {uncond_gen:.4} | "
-                        f"c_g: {cond_p_gen:.4} | "
-                        f"k: {kl:.4}"
+                        f"uD:{uncond_disc_real:.4} | "
+                        f"c+D:{cond_disc_real:.4} | "
+                        f"c-D:{cond_disc_fake:.4} | "
+                        f"L1:{l1_reconstruction:.4} | "
+                        f"uG:{uncond_gen:.4} | "
+                        f"cG:{cond_p_gen:.4} | "
+                        f"k:{kl:.4}"
                     )
 
                 losses.write(f"{epoch},{cond_disc_fake},{cond_disc_real},{uncond_disc_real}"
