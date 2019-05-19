@@ -6,16 +6,15 @@ import numpy as np
 import torch.optim as optim
 import visdom
 import torch
+from loss import Loss
 from blocks import Discriminator
-from loss import loss_real_discriminator, loss_synthetic_discriminator
-from loss import loss_generator, loss_generator_reconstruction
 from math import ceil
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from tqdm import trange
 from utils import Utils
 from blocks import Generator
-from image_io import disp_sidebyside
+from image_io import disp_sidebyside, save_img
 from load_dataset import ParseDatasets
 from preprocess_caption import PreprocessCaption
 
@@ -113,6 +112,9 @@ if args.runtype == "train":
     losses = open("losses.csv", 'w')
     losses.write("epoch,cond_disc_fake,cond_disc_real,uncond_disc_real,l1_reconstruction,kl,cond_p_gen,uncond_gen\n")
 
+    lambda_1 = 10
+    lambda_2 = 0.2
+    
     try:
         with trange(args.no_epochs) as t:
             for epoch in t:
@@ -138,22 +140,22 @@ if args.runtype == "train":
                     img = img.mul(2)
                     img = img.sub(1)
 
-                    # caption = caption.permute(1, 0, 2)
+                    loss = Loss(image=img, text=caption, text_length=no_words.squeeze(), generator=generator,
+                                discriminator=discriminator, params=params, lambda_1=lambda_1, lambda_2=lambda_2)
 
+                    # Train step discriminator
                     discriminator.zero_grad()
-                    no_words = no_words.squeeze()
-                    lrd = loss_real_discriminator(img, caption, no_words, discriminator, generator, 10.0, params)
+                    lrd = loss.loss_real_discriminator()
                     lrd.backward()
-                    lsd = loss_synthetic_discriminator(img, caption, no_words, discriminator, generator, params)
+                    lsd = loss.loss_synthetic_discriminator()
                     lsd.backward()
                     od.step()
 
+                    # Train step generator
                     generator.zero_grad()
-                    lgs, fake, negative_text = loss_generator(img, caption, no_words, discriminator, generator, 10.0,
-                                                              params)
+                    lgs, fake = loss.loss_generator()
                     lgs.backward()
-                    lgr, kld = loss_generator_reconstruction(img, caption, no_words, discriminator, generator, 0.2,
-                                                             params)
+                    lgr, kld = loss.loss_generator_reconstruction()
                     lgr.backward()
                     og.step()
 
