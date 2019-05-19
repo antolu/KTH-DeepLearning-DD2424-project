@@ -32,15 +32,18 @@ class Utils :
         parser.add_argument("--pretrained_optimizer_generator",
                             type=str, required=False, help="Load a pretrained optimizer for the generator with a certain learning rate and parameters")
 
+        parser.add_argument("--batch_size",
+                            type=int, required=False, help="Batch size for training")
+        
         return parser.parse_args()
 
-    def read_blacklist(path) :
+    def read_blacklist(path):
 
         blacklist = set()
 
-        with open(path, "r") as f :
-            for line in f :
-                if line.startswith("#") :
+        with open(path, "r") as f:
+            for line in f:
+                if line.startswith("#"):
                     continue
                 blacklist.add(line.rstrip())
 

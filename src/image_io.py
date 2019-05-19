@@ -43,6 +43,7 @@ def disp_sidebyside(images, caption=None) :
     f.clear()
     plt.close(f)
 
+
 def save_img(img, caption, filename, dir="") :
     if type(img) is torch.Tensor :
             img = img.detach().permute(1, 2, 0).numpy()
