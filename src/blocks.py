@@ -195,6 +195,7 @@ class Discriminator(nn.Module):
     def __init__(self, num_words, device="cpu"):
         super().__init__()
         self.device = device
+        self.eps = 1e-8
 
         # IMAGE ENCODER
         self.conv3 = nn.Sequential(
@@ -298,8 +299,7 @@ class Discriminator(nn.Module):
         total = 0
         total_neg = 0
 
-
-        idx = np.arange(0, image.size(0))
+        idx = torch.arange(image.size(0))
         idx_neg = torch.tensor(np.roll(idx, 1))
 
         for j in range(3):
@@ -326,9 +326,9 @@ class Discriminator(nn.Module):
 
         alphas_neg = alphas[idx_neg, :]  # need to change this
         # total_neg should be (batch_size)
-        total_neg = torch.pow(total_neg, alphas_neg).prod(1)
+        total_neg = (alphas_neg * torch.clamp(torch.log(total_neg + self.eps), max=0)).sum(1)
         # total should be (batch_size)
-        total = torch.pow(total, alphas).prod(1)
+        total = (alphas * torch.clamp(torch.log(total + self.eps), max=0)).sum(1)
 
         unconditional = d
         cond_positive = total

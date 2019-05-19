@@ -8,9 +8,9 @@ def loss_generator(image, text, text_length, D, G, lambda_1, params):
     negative_text_length = text_length[inds]
     fake, mu, log_sigma = G(image, negative_text, negative_text_length)
     uncond, cond, _ = D(fake, negative_text, negative_text_length)
-    l1 = binary_cross_entropy_with_logits(uncond.detach(), torch.ones_like(uncond))
+    l1 = binary_cross_entropy_with_logits(uncond, torch.ones_like(uncond))
     params["uncond_gen"] += l1
-    l2 = binary_cross_entropy(cond.detach(), torch.ones_like(cond))
+    l2 = binary_cross_entropy(cond, torch.ones_like(cond))
     params["cond_p_gen"] += l2
 
     log_Sigma = 2 * log_sigma
@@ -36,8 +36,8 @@ def loss_generator_reconstruction(image, text, text_length, D, G, lambda_2, para
 def loss_real_discriminator(image, text, text_length, D, G, lambda_1, params):
     uncond, cond, cond_n = D(image, text, text_length)
     l1 = binary_cross_entropy_with_logits(uncond, torch.ones_like(uncond))
-    l2 = binary_cross_entropy(cond, torch.ones_like(cond))
-    l3 = binary_cross_entropy(cond_n, torch.zeros_like(cond_n))
+    l2 = binary_cross_entropy_with_logits(cond, torch.ones_like(cond))
+    l3 = binary_cross_entropy_with_logits(cond_n, torch.zeros_like(cond_n))
     params["uncond_disc_real"] += l1
     t = (l2 + l3) / 2.0
     params["cond_disc_real"] += t

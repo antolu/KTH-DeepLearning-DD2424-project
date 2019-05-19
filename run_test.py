@@ -82,10 +82,10 @@ if args.runtype == "train":
     generator.train()
     discriminator.train()
 
-    od = optim.Adam(generator.parameters(),
+    od = optim.Adam(discriminator.parameters(),
                     lr=0.0002,
                     betas=(0.5, 0.999))
-    og = optim.Adam(discriminator.parameters(), lr=0.0002,
+    og = optim.Adam(generator.parameters(), lr=0.0002,
                     betas=(0.5, 0.999))
 
     # Load pretrained optimizers
@@ -139,7 +139,6 @@ if args.runtype == "train":
                     lrd.backward()
                     lsd = loss_synthetic_discriminator(img, caption, no_words, discriminator, generator, params)
                     lsd.backward()
-                    score = lrd.detach().cpu().numpy().squeeze() + lsd.detach().cpu().numpy().squeeze()
                     od.step()
 
                     generator.zero_grad()
@@ -149,8 +148,6 @@ if args.runtype == "train":
                     lgr, kld = loss_generator_reconstruction(img, caption, no_words, discriminator, generator, 2.0,
                                                              params)
                     lgr.backward()
-                    score = lgs.detach().cpu().numpy().squeeze() + lgr.detach().cpu().numpy().squeeze()
-
                     og.step()
 
                     den = (i_batch + 1)
