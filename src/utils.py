@@ -25,7 +25,7 @@ class Utils :
 
         parser.add_argument("--max_no_words", type=int, required=True, help="Maximum number of words for the model")
 
-        parser.add_argument("--runtype", type=str, required=True, help="Run train or test")
+        parser.add_argument("--mode", type=str, required=True, help="Run train or test")
         parser.add_argument("--no_epochs", type=int, required=False, help="Number of training epochs to run")
         parser.add_argument("--pretrained_optimizer_discriminator",
                             type=str, required=False, help="Load a pretrained optimizer for the discriminator with a certain learning rate and parameters")

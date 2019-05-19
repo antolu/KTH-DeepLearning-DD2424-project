@@ -1,6 +1,6 @@
 . ./CONFIG
 
-python run_test.py --images_root $COCO_IMAGES_ROOT \
+python run.py --images_root $COCO_IMAGES_ROOT \
                     --annotations_root $COCO_CAPTIONS_ROOT \
                     --dataset coco \
                     --coco_set test \
@@ -10,7 +10,7 @@ python run_test.py --images_root $COCO_IMAGES_ROOT \
                     --pretrained_discriminator $PRETRAINED_COCO_D \
                     --max_no_words $MAX_NO_WORDS \
                     --blacklist $BLACKLIST \
-                    --runtype test \
+                    --mode test \
 		    --no_epochs 600 \
                     --pretrained_optimizer_discriminator $PRETRAINED_COCO_OD \
                     --pretrained_optimizer_generator $PRETRAINED_COCO_OG
