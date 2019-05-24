@@ -74,11 +74,11 @@ discriminator = Discriminator(device).to(device)
 # Load pretrained models
 if args.pretrained_generator is not None:
     print("Loading pretrained generator")
-    pretrained_generator = torch.load(args.pretrained_generator)
+    pretrained_generator = torch.load(args.pretrained_generator, map_location=device)
     generator.load_state_dict(pretrained_generator, strict=False)
 if args.pretrained_discriminator is not None:
     print("Loading pretrained discriminator")
-    pretrained_discriminator = torch.load(args.pretrained_discriminator)
+    pretrained_discriminator = torch.load(args.pretrained_discriminator, map_location=device)
     discriminator.load_state_dict(pretrained_discriminator, strict=False)
 
 if args.mode == "train":
